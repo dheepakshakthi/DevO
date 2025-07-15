@@ -14,3 +14,4 @@ progress 9:30 PM : test application debugging
 progress 10:00 PM : adding additional features
 progress 10:30 PM : adding additional features
 progress 11:00 PM : adding additional features
+progress 11:30 PM : bug fixing
