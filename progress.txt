@@ -18,3 +18,4 @@ progress 11:30 PM : bug fixing
 progress 12:00 AM : bug fixing
 progress 12:30 AM : bug fixing
 progress 1:00 AM : bug fixing
+progress 2:45 AM : application deployment
