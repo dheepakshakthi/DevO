@@ -1,4 +1,4 @@
-# RepoContainerizer 🚀
+# DevO 🚀
 
 An advanced LLM-powered AI agent tool that automates the process of understanding and containerizing GitHub repositories. This tool eliminates the guesswork from running code by automatically analyzing repositories and generating production-ready Docker configurations.
 
