@@ -11,3 +11,4 @@ progress 7:30 PM : test application debugging
 progress 8:00 PM : test application debugging 
 progress 9:00 PM : test application debugging
 progress 9:30 PM : test application debugging 
+progress 10:00 : adding additional features
