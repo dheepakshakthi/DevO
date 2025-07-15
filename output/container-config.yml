@@ -1,50 +1,33 @@
 analysis:
   build_tools:
-  - docker
-  database: sqlite
+  - python build
+  database: redis
   dependencies:
-  - flask-cors
-  - flask
-  - aliyun-python-sdk-core
-  - pyyaml
-  - httpx
-  - paypalrestsdk
-  - alibabacloud_dysmsapi20170525
-  - apscheduler
-  - alembic
-  - certifi
-  - flask-limiter
-  - openai
-  - aliyun-python-sdk-eci
-  - alipay-sdk-python
+  - blinker
   - click
-  - boto3
-  - python-gitlab
-  - flask-sqlalchemy
-  - typed_ast
-  external_services:
-  - mysql
+  - itsdangerous
+  - jinja2
+  - markupsafe
+  - werkzeug
+  external_services: []
   framework: flask
   package_manager: pip
   primary_language: Python
 containerization:
   commands:
-    build: python setup.py build (if applicable)
+    build: python -m compileall src
     install: pip install --no-cache-dir -r requirements.txt
-    start: python app.py
-    test: pytest
+    start: flask run --host=0.0.0.0 --port=$PORT
+    test: pytest tests
   environment_variables:
-    APP_SETTINGS: Configuration file location, e.g., config.py
-    DATABASE_URL: Database connection URL (if using external DB)
-    FLASK_APP: Entry point for flask application, e.g., app.py
-    FLASK_ENV: Development or Production
-    OPENAI_API_KEY: OpenAI API Key
-    PORT: 'Application port (default: 8080)'
-    PWD: Current working directory
+    FLASK_APP: app.py
+    FLASK_ENV: production
+    PORT: '8080'
+    REDIS_URL: redis://redis:6379
   health_check:
     interval: 30s
     retries: 3
-    test: curl -f http://localhost:8080/app/get || exit 1
+    test: redis-cli ping || exit 1
     timeout: 10s
   image_name: python-app
   ports:

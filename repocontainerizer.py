@@ -20,6 +20,14 @@ import zipfile
 import platform
 from datetime import datetime
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without it
+    pass
+
 # Optional imports with fallbacks
 try:
     import yaml
@@ -2063,11 +2071,7 @@ Examples:
             os.environ["GEMINI_API_KEY"] = args.api_key
         
         # Initialize containerizer
-        containerizer = RepoContainerizer(
-            output_dir=args.output,
-            validate=args.validate,
-            config_format=args.format
-        )
+        containerizer = RepoContainerizer()
         
         # Execute command
         if args.command == "analyze":
@@ -2080,7 +2084,7 @@ Examples:
                 sys.exit(1)
                 
         elif args.command == "containerize":
-            result = containerizer.containerize_repository(args.target)
+            result = containerizer.containerize_repo(args.target, args.output, args.format, args.validate)
             if result:
                 print_colored_text("✅ Repository containerization completed successfully!", "green")
                 print_colored_text(f"🐳 Docker files saved to: {args.output}", "blue")

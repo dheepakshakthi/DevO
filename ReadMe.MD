@@ -37,7 +37,12 @@ cd DevO-Hackfinity
 # Install dependencies using uv
 uv sync
 
-# Set API key
+# Set up API key (choose one method)
+# Method 1: Create .env file (recommended)
+copy .env.example .env
+# Edit .env and add your API key: GEMINI_API_KEY=your_api_key_here
+
+# Method 2: Environment variable (temporary)
 set GEMINI_API_KEY=your_api_key_here
 
 # Run the tool
@@ -56,7 +61,12 @@ cd DevO-Hackfinity
 # Install dependencies using uv
 uv sync
 
-# Set API key
+# Set up API key (choose one method)
+# Method 1: Create .env file (recommended)
+cp .env.example .env
+# Edit .env and add your API key: GEMINI_API_KEY=your_api_key_here
+
+# Method 2: Environment variable (temporary)
 export GEMINI_API_KEY=your_api_key_here
 
 # Run the tool

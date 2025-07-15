@@ -18,6 +18,8 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 from urllib.parse import urlparse
 import base64
+from datetime import datetime
+import re
 
 import click
 from rich.console import Console
@@ -29,6 +31,14 @@ from rich.prompt import Prompt, Confirm
 import git
 import google.generativeai as genai
 from google.generativeai import types
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If python-dotenv is not installed, continue without it
+    pass
 
 # Import utility functions
 from utils import (
@@ -759,6 +769,426 @@ def setup():
         console.print("✅ GEMINI_API_KEY is configured")
     
     console.print("\n🎉 Setup complete! Ready to containerize repositories.")
+
+@cli.command()
+@click.argument('repo_path')
+@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
+@click.option('--output', '-o', default='./suggestions', help='Output directory for suggestions')
+@click.option('--language', '-l', help='Programming language filter')
+@click.option('--focus', '-f', type=click.Choice(['security', 'performance', 'maintainability', 'all']), 
+              default='all', help='Focus area for suggestions')
+def suggest(repo_path, api_key, output, language, focus):
+    """Get AI-powered code suggestions for a repository"""
+    
+    if not api_key:
+        console.print("❌ API key required. Set GEMINI_API_KEY environment variable or use --api-key option.")
+        sys.exit(1)
+    
+    console.print(Panel.fit(
+        "[bold blue]🤖 AI Code Suggestions[/bold blue]\n"
+        "[dim]Analyzing code and providing improvement suggestions[/dim]",
+        border_style="blue"
+    ))
+    
+    try:
+        suggester = CodeSuggester(api_key)
+        suggestions = suggester.analyze_and_suggest(repo_path, language, focus)
+        
+        # Create output directory
+        os.makedirs(output, exist_ok=True)
+        
+        # Save suggestions to file
+        suggestions_file = os.path.join(output, 'code_suggestions.md')
+        with open(suggestions_file, 'w', encoding='utf-8') as f:
+            f.write(suggestions)
+        
+        console.print(f"✅ Code suggestions saved to: {suggestions_file}")
+        
+        # Display summary
+        console.print("\n[bold]Suggestion Summary:[/bold]")
+        console.print(f"📁 Repository: {repo_path}")
+        console.print(f"🎯 Focus: {focus}")
+        console.print(f"💾 Output: {suggestions_file}")
+        
+    except Exception as e:
+        console.print(f"❌ Error generating suggestions: {str(e)}")
+        sys.exit(1)
+
+@cli.command()
+@click.argument('repo_path')
+@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
+@click.option('--output', '-o', default='./dependency_report', help='Output directory for reports')
+@click.option('--fix', '-f', is_flag=True, help='Automatically fix detected issues')
+@click.option('--format', type=click.Choice(['markdown', 'json', 'yaml']), default='markdown', 
+              help='Report format')
+def check_deps(repo_path, api_key, output, fix, format):
+    """Check and report missing dependencies"""
+    
+    if not api_key:
+        console.print("❌ API key required. Set GEMINI_API_KEY environment variable or use --api-key option.")
+        sys.exit(1)
+    
+    console.print(Panel.fit(
+        "[bold blue]🔍 Dependency Analysis[/bold blue]\n"
+        "[dim]Checking for missing dependencies and compatibility issues[/dim]",
+        border_style="blue"
+    ))
+    
+    try:
+        checker = DependencyChecker(api_key)
+        report = checker.analyze_dependencies(repo_path)
+        
+        # Create output directory
+        os.makedirs(output, exist_ok=True)
+        
+        # Save report
+        if format == 'markdown':
+            report_file = os.path.join(output, 'dependency_report.md')
+            with open(report_file, 'w', encoding='utf-8') as f:
+                f.write(report['markdown'])
+        elif format == 'json':
+            report_file = os.path.join(output, 'dependency_report.json')
+            with open(report_file, 'w', encoding='utf-8') as f:
+                json.dump(report['data'], f, indent=2)
+        else:  # yaml
+            report_file = os.path.join(output, 'dependency_report.yaml')
+            with open(report_file, 'w', encoding='utf-8') as f:
+                yaml.dump(report['data'], f, default_flow_style=False)
+        
+        console.print(f"✅ Dependency report saved to: {report_file}")
+        
+        # Display summary
+        missing_count = len(report['data'].get('missing_dependencies', []))
+        outdated_count = len(report['data'].get('outdated_dependencies', []))
+        conflicts_count = len(report['data'].get('conflicts', []))
+        
+        table = Table(title="Dependency Analysis Summary")
+        table.add_column("Issue Type", style="cyan")
+        table.add_column("Count", style="magenta")
+        table.add_column("Status", style="green")
+        
+        table.add_row("Missing Dependencies", str(missing_count), 
+                     "🔴 Critical" if missing_count > 0 else "✅ OK")
+        table.add_row("Outdated Dependencies", str(outdated_count), 
+                     "🟡 Warning" if outdated_count > 0 else "✅ OK")
+        table.add_row("Conflicts", str(conflicts_count), 
+                     "🔴 Critical" if conflicts_count > 0 else "✅ OK")
+        
+        console.print(table)
+        
+        # Auto-fix if requested
+        if fix and (missing_count > 0 or outdated_count > 0):
+            console.print("\n🔧 Auto-fixing detected issues...")
+            fixer = DependencyFixer(api_key)
+            fix_result = fixer.fix_dependencies(repo_path, report['data'])
+            
+            if fix_result['success']:
+                console.print("✅ Dependencies fixed successfully!")
+                console.print(f"📝 Fix summary: {fix_result['summary']}")
+            else:
+                console.print(f"❌ Failed to fix dependencies: {fix_result['error']}")
+        
+    except Exception as e:
+        console.print(f"❌ Error checking dependencies: {str(e)}")
+        sys.exit(1)
+
+@cli.command()
+@click.argument('repo_path')
+@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
+@click.option('--output', '-o', default='./fix_report', help='Output directory for fix reports')
+@click.option('--dry-run', is_flag=True, help='Show what would be fixed without making changes')
+@click.option('--backup', is_flag=True, default=True, help='Create backup before fixing')
+def fix_code(repo_path, api_key, output, dry_run, backup):
+    """Automatically fix common code issues using AI"""
+    
+    if not api_key:
+        console.print("❌ API key required. Set GEMINI_API_KEY environment variable or use --api-key option.")
+        sys.exit(1)
+    
+    console.print(Panel.fit(
+        "[bold blue]🔧 AI Code Fixer[/bold blue]\n"
+        "[dim]Automatically fixing common code issues[/dim]",
+        border_style="blue"
+    ))
+    
+    try:
+        fixer = CodeFixer(api_key)
+        
+        if dry_run:
+            console.print("🔍 Dry run mode - no changes will be made")
+            issues = fixer.scan_issues(repo_path)
+            
+            console.print(f"\n[bold]Issues found:[/bold]")
+            for issue in issues:
+                console.print(f"  🔴 {issue['file']}: {issue['description']}")
+                console.print(f"     💡 Suggested fix: {issue['fix']}")
+        else:
+            # Create backup if requested
+            if backup:
+                backup_path = f"{repo_path}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                shutil.copytree(repo_path, backup_path)
+                console.print(f"📦 Backup created: {backup_path}")
+            
+            # Fix issues
+            fix_result = fixer.fix_issues(repo_path)
+            
+            # Create output directory and save report
+            os.makedirs(output, exist_ok=True)
+            report_file = os.path.join(output, 'fix_report.md')
+            
+            with open(report_file, 'w', encoding='utf-8') as f:
+                f.write(fix_result['report'])
+            
+            console.print(f"✅ Fix report saved to: {report_file}")
+            console.print(f"🔧 Fixed {fix_result['fixed_count']} issues")
+            
+            if fix_result['failed_fixes']:
+                console.print(f"⚠️  {len(fix_result['failed_fixes'])} issues could not be fixed automatically")
+        
+    except Exception as e:
+        console.print(f"❌ Error fixing code: {str(e)}")
+        sys.exit(1)
+
+@cli.command()
+@click.argument('repo_path')
+@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
+@click.option('--output', '-o', default='./analysis_report', help='Output directory for analysis report')
+@click.option('--include-suggestions', is_flag=True, help='Include code suggestions in report')
+@click.option('--include-dependencies', is_flag=True, help='Include dependency analysis in report')
+@click.option('--include-security', is_flag=True, help='Include security analysis in report')
+def analyze(repo_path, api_key, output, include_suggestions, include_dependencies, include_security):
+    """Comprehensive AI-powered repository analysis"""
+    
+    if not api_key:
+        console.print("❌ API key required. Set GEMINI_API_KEY environment variable or use --api-key option.")
+        sys.exit(1)
+    
+    console.print(Panel.fit(
+        "[bold blue]🔬 Comprehensive Analysis[/bold blue]\n"
+        "[dim]AI-powered repository analysis with suggestions and fixes[/dim]",
+        border_style="blue"
+    ))
+    
+    try:
+        analyzer = ComprehensiveAnalyzer(api_key)
+        
+        with Progress() as progress:
+            task = progress.add_task("Analyzing repository...", total=100)
+            
+            # Basic analysis
+            progress.update(task, advance=20)
+            basic_analysis = analyzer.basic_analysis(repo_path)
+            
+            # Code suggestions
+            if include_suggestions:
+                progress.update(task, advance=20)
+                suggestions = analyzer.get_suggestions(repo_path)
+            else:
+                suggestions = None
+            
+            # Dependency analysis
+            if include_dependencies:
+                progress.update(task, advance=20)
+                dependencies = analyzer.check_dependencies(repo_path)
+            else:
+                dependencies = None
+            
+            # Security analysis
+            if include_security:
+                progress.update(task, advance=20)
+                security = analyzer.security_analysis(repo_path)
+            else:
+                security = None
+            
+            # Generate comprehensive report
+            progress.update(task, advance=20)
+            report = analyzer.generate_report(
+                basic_analysis, suggestions, dependencies, security
+            )
+        
+        # Create output directory and save report
+        os.makedirs(output, exist_ok=True)
+        report_file = os.path.join(output, 'comprehensive_analysis.md')
+        
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write(report)
+        
+        console.print(f"✅ Comprehensive analysis saved to: {report_file}")
+        
+        # Display summary
+        console.print("\n[bold]Analysis Summary:[/bold]")
+        console.print(f"📁 Repository: {repo_path}")
+        console.print(f"📊 Basic Analysis: ✅ Complete")
+        console.print(f"💡 Code Suggestions: {'✅ Included' if include_suggestions else '❌ Skipped'}")
+        console.print(f"📦 Dependencies: {'✅ Included' if include_dependencies else '❌ Skipped'}")
+        console.print(f"🔒 Security: {'✅ Included' if include_security else '❌ Skipped'}")
+        console.print(f"📄 Report: {report_file}")
+        
+    except Exception as e:
+        console.print(f"❌ Error during analysis: {str(e)}")
+        sys.exit(1)
+
+class CodeSuggester:
+    """AI-powered code suggestion generator"""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        if api_key:
+            genai.configure(api_key=api_key)
+        self.model = "gemini-2.0-flash-exp"
+    
+    def analyze_and_suggest(self, repo_path: str, language: str = None, focus: str = "all") -> str:
+        """Analyze code and generate suggestions"""
+        try:
+            # Scan repository for code files
+            code_files = self._scan_code_files(repo_path, language)
+            
+            # Analyze each file and generate suggestions
+            suggestions = []
+            
+            for file_path in code_files[:10]:  # Limit to first 10 files
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                    
+                    file_suggestions = self._analyze_file(file_path, content, focus)
+                    if file_suggestions:
+                        suggestions.append(file_suggestions)
+                        
+                except Exception as e:
+                    console.print(f"⚠️  Could not analyze {file_path}: {str(e)}")
+            
+            # Generate comprehensive report
+            return self._generate_suggestions_report(suggestions, repo_path, focus)
+            
+        except Exception as e:
+            console.print(f"❌ Error analyzing code: {str(e)}")
+            return f"# Code Analysis Error\n\nFailed to analyze repository: {str(e)}"
+    
+    def _scan_code_files(self, repo_path: str, language: str = None) -> List[str]:
+        """Scan repository for code files"""
+        extensions = {
+            'python': ['.py'],
+            'javascript': ['.js', '.jsx', '.ts', '.tsx'],
+            'java': ['.java'],
+            'go': ['.go'],
+            'rust': ['.rs'],
+            'cpp': ['.cpp', '.cc', '.cxx', '.c++'],
+            'c': ['.c', '.h'],
+            'csharp': ['.cs'],
+            'php': ['.php'],
+            'ruby': ['.rb'],
+            'swift': ['.swift'],
+            'kotlin': ['.kt'],
+            'scala': ['.scala']
+        }
+        
+        if language:
+            target_extensions = extensions.get(language.lower(), [])
+        else:
+            target_extensions = [ext for exts in extensions.values() for ext in exts]
+        
+        code_files = []
+        for root, dirs, files in os.walk(repo_path):
+            # Skip common directories
+            dirs[:] = [d for d in dirs if d not in ['.git', '__pycache__', 'node_modules', '.venv', 'venv']]
+            
+            for file in files:
+                if any(file.endswith(ext) for ext in target_extensions):
+                    code_files.append(os.path.join(root, file))
+        
+        return code_files
+    
+    def _analyze_file(self, file_path: str, content: str, focus: str) -> Dict:
+        """Analyze a single file and generate suggestions"""
+        try:
+            model = genai.GenerativeModel(
+                model_name=self.model,
+                system_instruction=f"""You are an expert code reviewer. Analyze the provided code and give specific, actionable suggestions.
+
+Focus areas: {focus}
+
+For each suggestion, provide:
+1. Issue description
+2. Severity (low, medium, high, critical)
+3. Specific code location
+4. Recommended fix with code example
+5. Explanation of why this improves the code
+
+Be concise but thorough. Focus on practical improvements."""
+            )
+            
+            prompt = f"""
+Analyze this code file and provide improvement suggestions:
+
+File: {file_path}
+
+```
+{content[:5000]}  # Limit content to avoid token limits
+```
+
+Please provide structured suggestions focusing on {focus} improvements.
+"""
+            
+            response = model.generate_content(prompt)
+            
+            return {
+                'file': file_path,
+                'content': content[:200] + '...' if len(content) > 200 else content,
+                'suggestions': response.text
+            }
+            
+        except Exception as e:
+            console.print(f"⚠️  Could not analyze {file_path}: {str(e)}")
+            return None
+    
+    def _generate_suggestions_report(self, suggestions: List[Dict], repo_path: str, focus: str) -> str:
+        """Generate a comprehensive suggestions report"""
+        report = f"""# Code Suggestions Report
+
+**Repository:** {repo_path}
+**Focus:** {focus}
+**Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+## Summary
+
+Analyzed {len(suggestions)} files and generated improvement suggestions.
+
+## File Analysis
+
+"""
+        
+        for suggestion in suggestions:
+            report += f"""
+### {suggestion['file']}
+
+{suggestion['suggestions']}
+
+---
+
+"""
+        
+        report += """
+## Recommendations
+
+1. **Review all critical and high severity issues first**
+2. **Test changes in a development environment**
+3. **Consider implementing automated linting/formatting**
+4. **Regular code reviews can prevent many of these issues**
+
+## Next Steps
+
+1. Prioritize fixes based on severity
+2. Create feature branches for each fix
+3. Test thoroughly before merging
+4. Update documentation as needed
+
+---
+*Generated by DevO AI Code Suggestions*
+"""
+        
+        return report
+
 
 if __name__ == "__main__":
     cli()

@@ -1,45 +1,32 @@
 version: '3.8'
 
 services:
-  devopsgpt:
-    image: devopsgpt:latest
+  app:
     build: .
     ports:
       - "8080:8080"
+    depends_on:
+      - redis
     environment:
+      - REDIS_URL=redis://redis:6379
       - FLASK_ENV=production
-      - PORT=8080
-      - DATABASE_URL=sqlite:///./db/devopsgpt.db # Example: Use appropriate URL
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      - ./workspace:/app/workspace
       - ./logs:/app/logs
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/app/get"]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
-    depends_on:
-      db:
-        condition: service_healthy
 
-  db:
-    image: mysql:8.0 # Or the appropriate database image
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: devopsgpt
-      MYSQL_USER: devopsgpt_user
-      MYSQL_PASSWORD: devopsgpt_password
-    volumes:
-      - db_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  db_data:
+  logs:
