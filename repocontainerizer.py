@@ -876,110 +876,6 @@ EXPOSE 8080
 # Run the application
 CMD ["echo", "Please configure your application"]
 '''
-        
-        elif language == 'javascript':
-            if framework == 'react':
-                return '''FROM node:18-alpine AS build
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Production stage
-FROM nginx:alpine
-
-# Copy built app
-COPY --from=build /app/build /usr/share/nginx/html
-
-# Expose port
-EXPOSE 80
-
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
-'''
-            elif framework == 'express':
-                return '''FROM node:18-alpine
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
-RUN chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 3000
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
-    CMD curl -f http://localhost:3000/health || exit 1
-
-# Run the application
-CMD ["node", "server.js"]
-'''
-            else:  # generic javascript
-                return '''FROM node:18-alpine
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy application code
-COPY . .
-
-# Create non-root user
-RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
-RUN chown -R appuser:appuser /app
-USER appuser
-
-# Expose port
-EXPOSE 3000
-
-# Run the application
-CMD ["node", "index.js"]
-'''
-        
-        else:
-            return '''FROM alpine:latest
-
-WORKDIR /app
-
-# Copy application code
-COPY . .
-
-# Expose port
-EXPOSE 8080
-
-# Run the application
-CMD ["echo", "Please configure your application"]
-'''
-
-# Run the application
-CMD ["echo", "Please configure your application"]
-'''
     
     def generate_docker_compose(self, language: str, framework: str) -> str:
         """Generate docker-compose.yml"""
@@ -1610,7 +1506,7 @@ The container includes a health check endpoint at `/health`.
                 
                 # Detect build commands
                 console.print("🛠️  Detecting build and setup commands...")
-                commands = self.detect_build_commands(temp_path, language, framework)
+                commands = self.analyzer.detect_build_commands(temp_path, language, framework)
                 
                 if use_uv:
                     console.print("📦 Detected uv package manager - using uv for Python dependencies")
