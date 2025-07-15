@@ -334,12 +334,225 @@ class RepositoryAnalyzer:
         
         return dependencies
     
+    def detect_build_commands(self, repo_path: Path, language: str, framework: str) -> Dict[str, List[str]]:
+        """Detect build and setup commands for the repository"""
+        commands = {
+            "setup": [],
+            "build": [],
+            "run": [],
+            "test": [],
+            "install": []
+        }
+        
+        # Python projects
+        if language == "python":
+            # Check for uv package manager first
+            has_uv_lock = (repo_path / "uv.lock").exists()
+            has_pyproject = (repo_path / "pyproject.toml").exists()
+            has_requirements = (repo_path / "requirements.txt").exists()
+            
+            # Prioritize uv if lock file exists or pyproject.toml is present
+            if has_uv_lock or (has_pyproject and not has_requirements):
+                commands["install"].append("uv sync")
+                commands["setup"].append("uv venv")  # Create virtual environment
+                if has_pyproject:
+                    commands["install"].append("uv pip install -e .")
+            elif has_requirements:
+                # Check if we should use uv with requirements.txt
+                commands["install"].append("uv pip install -r requirements.txt")
+            elif has_pyproject:
+                commands["install"].append("uv pip install .")
+            elif (repo_path / "setup.py").exists():
+                commands["install"].append("uv pip install -e .")
+            else:
+                # Fallback to pip if no package manager is detected
+                if has_requirements:
+                    commands["install"].append("pip install -r requirements.txt")
+                elif has_pyproject:
+                    commands["install"].append("pip install .")
+                elif (repo_path / "setup.py").exists():
+                    commands["install"].append("pip install -e .")
+            
+            # Framework-specific commands
+            if framework == "django":
+                commands["setup"].extend([
+                    "python manage.py migrate",
+                    "python manage.py collectstatic --noinput"
+                ])
+                commands["run"].append("python manage.py runserver 0.0.0.0:8000")
+                commands["test"].append("python manage.py test")
+            elif framework == "flask":
+                commands["run"].append("python app.py")
+                commands["test"].append("python -m pytest")
+            elif framework == "fastapi":
+                commands["run"].append("uvicorn main:app --host 0.0.0.0 --port 8000")
+                commands["test"].append("python -m pytest")
+            else:
+                # Generic Python
+                main_files = ["main.py", "app.py", "run.py", "server.py"]
+                for main_file in main_files:
+                    if (repo_path / main_file).exists():
+                        commands["run"].append(f"python {main_file}")
+                        break
+                commands["test"].append("python -m pytest")
+        
+        # JavaScript/Node.js projects
+        elif language == "javascript":
+            # Check for package.json
+            package_json = repo_path / "package.json"
+            if package_json.exists():
+                commands["install"].append("npm install")
+                
+                try:
+                    with open(package_json, 'r') as f:
+                        package_data = json.load(f)
+                        scripts = package_data.get('scripts', {})
+                        
+                        # Common script mappings
+                        if 'start' in scripts:
+                            commands["run"].append("npm start")
+                        if 'dev' in scripts:
+                            commands["run"].append("npm run dev")
+                        if 'build' in scripts:
+                            commands["build"].append("npm run build")
+                        if 'test' in scripts:
+                            commands["test"].append("npm test")
+                        
+                        # Framework-specific
+                        if framework == "react":
+                            if 'build' not in scripts:
+                                commands["build"].append("npm run build")
+                            if 'start' not in scripts:
+                                commands["run"].append("npm start")
+                        elif framework == "next":
+                            commands["build"].append("npm run build")
+                            commands["run"].append("npm run start")
+                        elif framework == "express":
+                            if 'start' not in scripts:
+                                commands["run"].append("node server.js")
+                        
+                except Exception:
+                    # Fallback commands
+                    commands["build"].append("npm run build")
+                    commands["run"].append("npm start")
+                    commands["test"].append("npm test")
+        
+        # Java projects
+        elif language == "java":
+            if (repo_path / "pom.xml").exists():
+                commands["install"].append("mvn clean install")
+                commands["build"].append("mvn package")
+                commands["run"].append("mvn spring-boot:run")
+                commands["test"].append("mvn test")
+            elif (repo_path / "build.gradle").exists():
+                commands["install"].append("./gradlew build")
+                commands["build"].append("./gradlew assemble")
+                commands["run"].append("./gradlew bootRun")
+                commands["test"].append("./gradlew test")
+        
+        # Go projects
+        elif language == "go":
+            if (repo_path / "go.mod").exists():
+                commands["install"].append("go mod download")
+                commands["build"].append("go build -o app .")
+                commands["run"].append("./app")
+                commands["test"].append("go test ./...")
+            else:
+                commands["install"].append("go get ./...")
+                commands["build"].append("go build -o app .")
+                commands["run"].append("./app")
+                commands["test"].append("go test ./...")
+        
+        # Rust projects
+        elif language == "rust":
+            if (repo_path / "Cargo.toml").exists():
+                commands["build"].append("cargo build --release")
+                commands["run"].append("cargo run")
+                commands["test"].append("cargo test")
+        
+        # PHP projects
+        elif language == "php":
+            if (repo_path / "composer.json").exists():
+                commands["install"].append("composer install")
+                commands["test"].append("./vendor/bin/phpunit")
+            commands["run"].append("php -S localhost:8000")
+        
+        # Ruby projects
+        elif language == "ruby":
+            if (repo_path / "Gemfile").exists():
+                commands["install"].append("bundle install")
+                commands["run"].append("bundle exec rails server")
+                commands["test"].append("bundle exec rspec")
+        
+        # C/C++ projects
+        elif language in ["c", "cpp"]:
+            if (repo_path / "CMakeLists.txt").exists():
+                commands["setup"].extend([
+                    "mkdir -p build",
+                    "cd build"
+                ])
+                commands["build"].extend([
+                    "cmake ..",
+                    "make"
+                ])
+                commands["run"].append("./main")
+            elif (repo_path / "Makefile").exists():
+                commands["build"].append("make")
+                commands["run"].append("./main")
+        
+        # Remove empty commands
+        return {k: v for k, v in commands.items() if v}
+    
     def generate_dockerfile(self, language: str, framework: str, dependencies: List[str]) -> str:
         """Generate Dockerfile based on detected stack"""
         
-        dockerfiles = {
-            'python': {
-                'django': '''FROM python:3.9-slim
+        # Check if we should use uv (this will be called from containerize_repo with repo context)
+        use_uv = hasattr(self, '_use_uv') and self._use_uv
+        
+        if language == 'python':
+            if framework == 'django':
+                if use_uv:
+                    return '''FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock* requirements.txt* ./
+
+# Install dependencies
+RUN if [ -f "uv.lock" ]; then uv sync --frozen; elif [ -f "pyproject.toml" ]; then uv pip install .; elif [ -f "requirements.txt" ]; then uv pip install -r requirements.txt; fi
+
+# Copy application code
+COPY . .
+
+# Collect static files
+RUN uv run python manage.py collectstatic --noinput
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the application
+CMD ["uv", "run", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+'''
+                else:
+                    return '''FROM python:3.9-slim
 
 WORKDIR /app
 
@@ -371,8 +584,48 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
 
 # Run the application
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
-''',
-                'flask': '''FROM python:3.9-slim
+'''
+            
+            elif framework == 'flask':
+                if use_uv:
+                    return '''FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock* requirements.txt* ./
+
+# Install dependencies
+RUN if [ -f "uv.lock" ]; then uv sync --frozen; elif [ -f "pyproject.toml" ]; then uv pip install .; elif [ -f "requirements.txt" ]; then uv pip install -r requirements.txt; fi
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:5000/health || exit 1
+
+# Run the application
+CMD ["uv", "run", "python", "app.py"]
+'''
+                else:
+                    return '''FROM python:3.9-slim
 
 WORKDIR /app
 
@@ -401,8 +654,108 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
 
 # Run the application
 CMD ["python", "app.py"]
-''',
-                'generic': '''FROM python:3.9-slim
+'''
+            
+            elif framework == 'fastapi':
+                if use_uv:
+                    return '''FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    curl \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+RUN pip install uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock* requirements.txt* ./
+
+# Install dependencies
+RUN if [ -f "uv.lock" ]; then uv sync --frozen; elif [ -f "pyproject.toml" ]; then uv pip install .; elif [ -f "requirements.txt" ]; then uv pip install -r requirements.txt; fi
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the application
+CMD ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+'''
+                else:
+                    return '''FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \\
+    gcc \\
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Run the application
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+'''
+            
+            else:  # generic python
+                if use_uv:
+                    return '''FROM python:3.9-slim
+
+WORKDIR /app
+
+# Install uv
+RUN pip install uv
+
+# Copy dependency files
+COPY pyproject.toml uv.lock* requirements.txt* ./
+
+# Install dependencies
+RUN if [ -f "uv.lock" ]; then uv sync --frozen; elif [ -f "pyproject.toml" ]; then uv pip install .; elif [ -f "requirements.txt" ]; then uv pip install -r requirements.txt; fi
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Run the application
+CMD ["uv", "run", "python", "main.py"]
+'''
+                else:
+                    return '''FROM python:3.9-slim
 
 WORKDIR /app
 
@@ -423,9 +776,10 @@ EXPOSE 8000
 # Run the application
 CMD ["python", "main.py"]
 '''
-            },
-            'javascript': {
-                'react': '''FROM node:18-alpine AS build
+        
+        elif language == 'javascript':
+            if framework == 'react':
+                return '''FROM node:18-alpine AS build
 
 WORKDIR /app
 
@@ -452,8 +806,9 @@ EXPOSE 80
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
-''',
-                'express': '''FROM node:18-alpine
+'''
+            elif framework == 'express':
+                return '''FROM node:18-alpine
 
 WORKDIR /app
 
@@ -480,8 +835,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
 
 # Run the application
 CMD ["node", "server.js"]
-''',
-                'generic': '''FROM node:18-alpine
+'''
+            else:  # generic javascript
+                return '''FROM node:18-alpine
 
 WORKDIR /app
 
@@ -505,13 +861,7 @@ EXPOSE 3000
 # Run the application
 CMD ["node", "index.js"]
 '''
-            }
-        }
         
-        if language in dockerfiles and framework in dockerfiles[language]:
-            return dockerfiles[language][framework]
-        elif language in dockerfiles:
-            return dockerfiles[language]['generic']
         else:
             return '''FROM alpine:latest
 
@@ -522,6 +872,110 @@ COPY . .
 
 # Expose port
 EXPOSE 8080
+
+# Run the application
+CMD ["echo", "Please configure your application"]
+'''
+        
+        elif language == 'javascript':
+            if framework == 'react':
+                return '''FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy built app
+COPY --from=build /app/build /usr/share/nginx/html
+
+# Expose port
+EXPOSE 80
+
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
+'''
+            elif framework == 'express':
+                return '''FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
+    CMD curl -f http://localhost:3000/health || exit 1
+
+# Run the application
+CMD ["node", "server.js"]
+'''
+            else:  # generic javascript
+                return '''FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application code
+COPY . .
+
+# Create non-root user
+RUN addgroup -g 1000 appuser && adduser -u 1000 -G appuser -s /bin/sh -D appuser
+RUN chown -R appuser:appuser /app
+USER appuser
+
+# Expose port
+EXPOSE 3000
+
+# Run the application
+CMD ["node", "index.js"]
+'''
+        
+        else:
+            return '''FROM alpine:latest
+
+WORKDIR /app
+
+# Copy application code
+COPY . .
+
+# Expose port
+EXPOSE 8080
+
+# Run the application
+CMD ["echo", "Please configure your application"]
+'''
 
 # Run the application
 CMD ["echo", "Please configure your application"]
@@ -618,6 +1072,7 @@ USAGE:
 
 COMMANDS:
     containerize <repo_url>     Containerize a GitHub repository
+    auto-setup <repo_url>       Automatically analyze and setup a repository
     config                      Manage configuration
     validate <dockerfile>       Validate a Dockerfile
     setup                       Setup and configure the tool
@@ -628,12 +1083,15 @@ OPTIONS:
     --output, -o <dir>         Output directory (default: ./output)
     --format, -f <fmt>         Config format: yaml|json (default: yaml)
     --validate                 Validate container after generation
+    --execute, -e              Execute generated setup script (auto-setup only)
     --verbose, -v              Verbose output
     --api-key <key>            Gemini API key (overrides config)
 
 EXAMPLES:
     repocontainerizer containerize https://github.com/owner/repo
     repocontainerizer containerize https://github.com/owner/repo -o ./containers --validate
+    repocontainerizer auto-setup https://github.com/owner/repo
+    repocontainerizer auto-setup https://github.com/owner/repo --execute
     repocontainerizer config set api_key your_api_key_here
     repocontainerizer setup
 
@@ -749,6 +1207,17 @@ For more information, visit: https://github.com/your-username/repocontainerizer
                 language = self.analyzer.detect_language(temp_path)
                 framework = self.analyzer.detect_framework(temp_path, language)
                 dependencies = self.analyzer.detect_dependencies(temp_path)
+                
+                # Check if uv should be used
+                use_uv = (temp_path / "uv.lock").exists() or (
+                    language == "python" and 
+                    (temp_path / "pyproject.toml").exists() and 
+                    not (temp_path / "requirements.txt").exists()
+                )
+                self.analyzer._use_uv = use_uv
+                
+                if use_uv:
+                    console.print("📦 Detected uv package manager - using uv for Python dependencies")
                 
                 console.print(f"🎯 Detected language: {language}")
                 console.print(f"🛠️  Detected framework: {framework}")
@@ -1049,6 +1518,26 @@ The container includes a health check endpoint at `/health`.
         elif command == "config":
             self.manage_config(args[1:])
         
+        elif command == "auto-setup":
+            if len(args) < 2:
+                console.print("❌ Repository URL required")
+                console.print("Usage: auto-setup <repo_url> [options]")
+                return
+            
+            repo_url = args[1]
+            
+            # Parse options
+            output_dir = None
+            execute = False
+            
+            for i, arg in enumerate(args):
+                if arg in ["--output", "-o"] and i + 1 < len(args):
+                    output_dir = args[i + 1]
+                elif arg in ["--execute", "-e"]:
+                    execute = True
+            
+            self.auto_setup_repo(repo_url, output_dir, execute)
+        
         elif command == "validate":
             if len(args) < 2:
                 console.print("❌ Dockerfile path required")
@@ -1075,19 +1564,548 @@ The container includes a health check endpoint at `/health`.
         else:
             console.print(f"❌ Unknown command: {command}")
             self.display_help()
-
-def main():
-    """Main entry point for the standalone application"""
-    app = RepoContainerizer()
     
-    # Handle no arguments
-    if len(sys.argv) == 1:
-        app.display_banner()
-        app.display_help()
-        return
+    def auto_setup_repo(self, repo_url: str, output_dir: str = None, execute: bool = False):
+        """Automatically analyze and setup a repository with appropriate commands"""
+        try:
+            # Setup
+            output_dir = output_dir or self.config.get("default_output_dir", "./output")
+            
+            self.logger.info(f"Starting auto-setup for {repo_url}")
+            
+            # Parse repository URL
+            owner, repo_name = self.analyzer.analyze_repo_url(repo_url)
+            console.print(f"🔍 Analyzing repository: {owner}/{repo_name}")
+            
+            # Get repository info
+            repo_info = self.analyzer.github.get_repo_info(owner, repo_name)
+            if repo_info:
+                console.print(f"📋 Description: {repo_info.get('description', 'No description available')}")
+                console.print(f"⭐ Stars: {repo_info.get('stars', 0)}")
+                if repo_info.get('language'):
+                    console.print(f"💻 GitHub detected language: {repo_info['language']}")
+            
+            # Create temporary directory
+            with tempfile.TemporaryDirectory() as temp_dir:
+                temp_path = Path(temp_dir)
+                
+                # Download repository
+                console.print("📥 Downloading repository...")
+                if not self.analyzer.github.download_repo(owner, repo_name, temp_dir):
+                    raise Exception("Failed to download repository")
+                
+                # Analyze repository structure
+                console.print("🔍 Analyzing repository structure...")
+                language = self.analyzer.detect_language(temp_path)
+                framework = self.analyzer.detect_framework(temp_path, language)
+                dependencies = self.analyzer.detect_dependencies(temp_path)
+                
+                # Check if uv should be used
+                use_uv = (temp_path / "uv.lock").exists() or (
+                    language == "python" and 
+                    (temp_path / "pyproject.toml").exists() and 
+                    not (temp_path / "requirements.txt").exists()
+                )
+                self.analyzer._use_uv = use_uv
+                
+                # Detect build commands
+                console.print("🛠️  Detecting build and setup commands...")
+                commands = self.detect_build_commands(temp_path, language, framework)
+                
+                if use_uv:
+                    console.print("📦 Detected uv package manager - using uv for Python dependencies")
+                
+                # Display analysis results
+                console.print("\n" + "="*60)
+                console.print("📊 REPOSITORY ANALYSIS RESULTS")
+                console.print("="*60)
+                
+                if RICH_AVAILABLE:
+                    # Create analysis table
+                    table = Table(title="Repository Analysis")
+                    table.add_column("Property", style="cyan", width=20)
+                    table.add_column("Value", style="magenta")
+                    
+                    table.add_row("Repository", f"{owner}/{repo_name}")
+                    table.add_row("Language", language.title())
+                    table.add_row("Framework", framework.title())
+                    table.add_row("Dependencies", str(len(dependencies)))
+                    table.add_row("Commands Found", str(len([cmd for cmds in commands.values() for cmd in cmds])))
+                    
+                    console.print(table)
+                    
+                    # Commands table
+                    if commands:
+                        cmd_table = Table(title="Detected Commands")
+                        cmd_table.add_column("Phase", style="green", width=15)
+                        cmd_table.add_column("Commands", style="yellow")
+                        
+                        for phase, cmds in commands.items():
+                            if cmds:
+                                cmd_table.add_row(phase.title(), "\n".join(cmds))
+                        
+                        console.print(cmd_table)
+                else:
+                    console.print(f"Repository: {owner}/{repo_name}")
+                    console.print(f"Language: {language.title()}")
+                    console.print(f"Framework: {framework.title()}")
+                    console.print(f"Dependencies: {len(dependencies)}")
+                    console.print(f"Commands Found: {len([cmd for cmds in commands.values() for cmd in cmds])}")
+                    
+                    # Show commands
+                    if commands:
+                        console.print("\n🛠️  Detected Commands:")
+                        for phase, cmds in commands.items():
+                            if cmds:
+                                console.print(f"\n{phase.title()}:")
+                                for cmd in cmds:
+                                    console.print(f"  • {cmd}")
+                
+                # Create output directory
+                output_path = Path(output_dir) / f"{repo_name}-setup"
+                output_path.mkdir(parents=True, exist_ok=True)
+                
+                # Generate setup script
+                console.print(f"\n📝 Generating setup script...")
+                script_content = self.generate_setup_script(temp_path, language, framework, commands, use_uv)
+                
+                # Determine script filename
+                is_windows = platform.system() == "Windows"
+                script_filename = f"setup{'.bat' if is_windows else '.sh'}"
+                script_path = output_path / script_filename
+                
+                with open(script_path, 'w') as f:
+                    f.write(script_content)
+                
+                # Make script executable on Unix systems
+                if not is_windows:
+                    os.chmod(script_path, 0o755)
+                
+                # Generate detailed analysis report
+                analysis_report = {
+                    "repository": {
+                        "url": repo_url,
+                        "owner": owner,
+                        "name": repo_name,
+                        "info": repo_info,
+                        "analysis_date": datetime.now().isoformat()
+                    },
+                    "detected_stack": {
+                        "language": language,
+                        "framework": framework,
+                        "dependencies": dependencies[:50]  # Limit to first 50
+                    },
+                    "setup_commands": commands,
+                    "recommendations": self.generate_recommendations(language, framework, commands, temp_path),
+                    "containerization": {
+                        "dockerfile_available": (temp_path / "Dockerfile").exists(),
+                        "docker_compose_available": (temp_path / "docker-compose.yml").exists(),
+                        "recommended_ports": self.get_recommended_ports(language, framework),
+                        "environment_variables": self.get_recommended_env_vars(language, framework)
+                    }
+                }
+                
+                # Save analysis report
+                report_path = output_path / "analysis-report.json"
+                with open(report_path, 'w') as f:
+                    json.dump(analysis_report, f, indent=2)
+                
+                # Generate README with setup instructions
+                readme_content = self.generate_setup_readme(repo_name, owner, language, framework, commands, dependencies)
+                readme_path = output_path / "SETUP_README.md"
+                with open(readme_path, 'w') as f:
+                    f.write(readme_content)
+                
+                # Execute setup script if requested
+                if execute:
+                    console.print(f"\n🚀 Executing setup script...")
+                    if self.execute_setup_script(script_path, temp_path):
+                        console.print("✅ Setup script executed successfully!")
+                    else:
+                        console.print("⚠️  Setup script execution completed with warnings (check logs)")
+                
+                # Display results
+                console.print("\n" + "="*60)
+                console.print("✅ AUTO-SETUP COMPLETED")
+                console.print("="*60)
+                
+                console.print(f"\n📁 Generated Files:")
+                console.print(f"  📄 Setup Script: {script_path}")
+                console.print(f"  📄 Analysis Report: {report_path}")
+                console.print(f"  📄 Setup README: {readme_path}")
+                
+                console.print(f"\n🎯 Next Steps:")
+                console.print(f"1. Navigate to: cd {output_path}")
+                console.print(f"2. Run setup script: ./{script_filename}")
+                console.print(f"3. Follow instructions in SETUP_README.md")
+                console.print(f"4. Containerize: python repocontainerizer.py containerize {repo_url}")
+                
+                self.logger.info(f"Auto-setup completed successfully for {repo_url}")
+                
+        except Exception as e:
+            error_msg = f"Error in auto-setup: {str(e)}"
+            self.logger.error(error_msg)
+            console.print(f"❌ {error_msg}")
+            return False
     
-    # Run the application
-    app.run(sys.argv[1:])
+    def generate_recommendations(self, language: str, framework: str, commands: Dict[str, List[str]], repo_path: Path) -> List[str]:
+        """Generate recommendations for the repository"""
+        recommendations = []
+        
+        # Check for missing files
+        if language == "python":
+            if not (repo_path / "requirements.txt").exists() and not (repo_path / "pyproject.toml").exists():
+                recommendations.append("Consider adding requirements.txt or pyproject.toml for dependency management")
+            
+            if not (repo_path / "README.md").exists():
+                recommendations.append("Add a README.md file with project description and setup instructions")
+            
+            if framework == "django" and not (repo_path / "manage.py").exists():
+                recommendations.append("This appears to be a Django project but manage.py is missing")
+        
+        elif language == "javascript":
+            if not (repo_path / "package.json").exists():
+                recommendations.append("Consider adding package.json for dependency management")
+            
+            if framework == "react" and not (repo_path / "public").exists():
+                recommendations.append("React projects typically need a public directory")
+        
+        # Security recommendations
+        if (repo_path / ".env").exists():
+            recommendations.append("Found .env file - ensure it's in .gitignore and not committed to version control")
+        
+        # Docker recommendations
+        if not (repo_path / "Dockerfile").exists():
+            recommendations.append("Consider adding a Dockerfile for containerization")
+        
+        # Testing recommendations
+        if "test" not in commands:
+            recommendations.append("No test commands detected - consider adding automated tests")
+        
+        return recommendations
+    
+    def get_recommended_ports(self, language: str, framework: str) -> List[str]:
+        """Get recommended ports for containerization"""
+        port_map = {
+            "python": {
+                "django": ["8000"],
+                "flask": ["5000"],
+                "fastapi": ["8000"]
+            },
+            "javascript": {
+                "react": ["3000", "80"],
+                "express": ["3000"],
+                "next": ["3000"]
+            },
+            "java": {
+                "spring": ["8080"]
+            }
+        }
+        
+        if language in port_map and framework in port_map[language]:
+            return port_map[language][framework]
+        
+        return ["8080"]  # Default port
+    
+    def get_recommended_env_vars(self, language: str, framework: str) -> Dict[str, str]:
+        """Get recommended environment variables"""
+        env_vars = {"NODE_ENV": "production"}
+        
+        if language == "python":
+            env_vars["PYTHONUNBUFFERED"] = "1"
+            if framework == "django":
+                env_vars["DJANGO_SETTINGS_MODULE"] = "myproject.settings"
+        elif language == "javascript":
+            if framework == "next":
+                env_vars["NEXT_TELEMETRY_DISABLED"] = "1"
+        
+        return env_vars
+    
+    def generate_setup_readme(self, repo_name: str, owner: str, language: str, framework: str, commands: Dict[str, List[str]], dependencies: List[str]) -> str:
+        """Generate a comprehensive setup README"""
+        return f"""# {repo_name} - Auto-Setup Guide
 
-if __name__ == "__main__":
-    main()
+## 🔍 Repository Analysis
+
+- **Repository**: {owner}/{repo_name}
+- **Language**: {language.title()}
+- **Framework**: {framework.title()}
+- **Dependencies**: {len(dependencies)} packages detected
+
+## 🚀 Quick Setup
+
+### Automatic Setup
+Run the generated setup script:
+```bash
+{"./setup.bat" if platform.system() == "Windows" else "./setup.sh"}
+```
+
+### Manual Setup
+
+{self._generate_manual_setup_section(commands)}
+
+## 📦 Dependencies
+
+{self._generate_dependencies_section(dependencies[:20])}
+
+## 🐳 Containerization
+
+To containerize this repository:
+```bash
+python repocontainerizer.py containerize https://github.com/{owner}/{repo_name}
+```
+
+## 📝 Generated Files
+
+- `setup.{"bat" if platform.system() == "Windows" else "sh"}` - Automated setup script
+- `analysis-report.json` - Detailed analysis results
+- `SETUP_README.md` - This file
+
+## 🎯 Next Steps
+
+1. Run the setup script
+2. Test the application locally
+3. Containerize for deployment
+4. Add tests if not present
+5. Add documentation
+
+---
+*Generated by RepoContainerizer v{__version__} on {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
+"""
+    
+    def _generate_manual_setup_section(self, commands: Dict[str, List[str]]) -> str:
+        """Generate manual setup section for README"""
+        content = ""
+        
+        if "install" in commands:
+            content += "#### 1. Install Dependencies\n```bash\n"
+            for cmd in commands["install"]:
+                content += f"{cmd}\n"
+            content += "```\n\n"
+        
+        if "setup" in commands:
+            content += "#### 2. Setup Project\n```bash\n"
+            for cmd in commands["setup"]:
+                content += f"{cmd}\n"
+            content += "```\n\n"
+        
+        if "build" in commands:
+            content += "#### 3. Build Project\n```bash\n"
+            for cmd in commands["build"]:
+                content += f"{cmd}\n"
+            content += "```\n\n"
+        
+        if "run" in commands:
+            content += "#### 4. Run Application\n```bash\n"
+            for cmd in commands["run"]:
+                content += f"{cmd}\n"
+            content += "```\n\n"
+        
+        if "test" in commands:
+            content += "#### 5. Run Tests\n```bash\n"
+            for cmd in commands["test"]:
+                content += f"{cmd}\n"
+            content += "```\n\n"
+        
+        return content or "No specific setup commands detected.\n\n"
+    
+    def _generate_dependencies_section(self, dependencies: List[str]) -> str:
+        """Generate dependencies section for README"""
+        if not dependencies:
+            return "No dependencies detected.\n\n"
+        
+        content = f"Found {len(dependencies)} dependencies:\n\n"
+        for dep in dependencies:
+            content += f"- {dep}\n"
+        
+        return content + "\n"
+    
+    def execute_setup_script(self, script_path: Path, repo_path: Path) -> bool:
+        """Execute the generated setup script"""
+        try:
+            console.print(f"🔧 Executing setup script: {script_path}")
+            
+            # Change to repository directory
+            original_cwd = os.getcwd()
+            os.chdir(repo_path)
+            
+            # Execute script
+            if platform.system() == "Windows":
+                result = subprocess.run(
+                    [str(script_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=600,  # 10 minutes timeout
+                    shell=True
+                )
+            else:
+                result = subprocess.run(
+                    [str(script_path)],
+                    capture_output=True,
+                    text=True,
+                    timeout=600,  # 10 minutes timeout
+                    executable="/bin/bash"
+                )
+            
+            # Log output
+            if result.stdout:
+                self.logger.info(f"Setup script output: {result.stdout}")
+            if result.stderr:
+                self.logger.warning(f"Setup script stderr: {result.stderr}")
+            
+            # Restore original directory
+            os.chdir(original_cwd)
+            
+            return result.returncode == 0
+            
+        except subprocess.TimeoutExpired:
+            self.logger.error("Setup script execution timed out")
+            return False
+        except Exception as e:
+            self.logger.error(f"Error executing setup script: {str(e)}")
+            return False
+        finally:
+            # Ensure we restore the original directory
+            try:
+                os.chdir(original_cwd)
+            except:
+                pass
+    
+    def generate_setup_script(self, repo_path: Path, language: str, framework: str, commands: Dict[str, List[str]], use_uv: bool = False) -> str:
+        """Generate a setup script for the repository"""
+        
+        # Determine script type based on OS
+        is_windows = platform.system() == "Windows"
+        script_ext = ".bat" if is_windows else ".sh"
+        
+        package_manager = "uv" if use_uv else ("pip" if language == "python" else "npm")
+        
+        if is_windows:
+            script_content = f"""@echo off
+REM Auto-generated setup script for {repo_path.name}
+REM Generated by RepoContainerizer v{__version__}
+REM Language: {language}, Framework: {framework}
+REM Package Manager: {package_manager}
+
+echo ==========================================
+echo Setting up {repo_path.name}
+echo ==========================================
+
+REM Check if required tools are installed
+echo Checking prerequisites...
+{"where uv >nul 2>&1" if use_uv else "where python >nul 2>&1"}
+if %errorlevel% neq 0 (
+    echo Error: {"uv" if use_uv else "Python"} is not installed or not in PATH
+    {"echo Please install uv: https://docs.astral.sh/uv/getting-started/installation/" if use_uv else "echo Please install Python: https://python.org/downloads/"}
+    exit /b 1
+)
+
+"""
+            
+            # Add setup commands
+            if "setup" in commands:
+                script_content += "echo Setting up project environment...\n"
+                for cmd in commands["setup"]:
+                    script_content += f"{cmd}\n"
+                script_content += "\n"
+            
+            # Add install commands
+            if "install" in commands:
+                script_content += "echo Installing dependencies...\n"
+                for cmd in commands["install"]:
+                    script_content += f"{cmd}\n"
+                    script_content += "if %errorlevel% neq 0 (echo Error: Installation failed & exit /b 1)\n"
+                script_content += "\n"
+            
+            # Add build commands
+            if "build" in commands:
+                script_content += "echo Building project...\n"
+                for cmd in commands["build"]:
+                    script_content += f"{cmd}\n"
+                    script_content += "if %errorlevel% neq 0 (echo Error: Build failed & exit /b 1)\n"
+                script_content += "\n"
+            
+            script_content += """echo ==========================================
+echo Setup completed successfully!
+echo ==========================================
+
+echo.
+echo Next steps:
+"""
+            
+            # Add run commands
+            if "run" in commands:
+                script_content += f"echo To run the application: {commands['run'][0]}\n"
+            
+            if "test" in commands:
+                script_content += f"echo To run tests: {commands['test'][0]}\n"
+            
+            script_content += """echo To containerize: python repocontainerizer.py containerize <repo_url>
+echo.
+pause
+"""
+        
+        else:
+            script_content = f"""#!/bin/bash
+# Auto-generated setup script for {repo_path.name}
+# Generated by RepoContainerizer v{__version__}
+# Language: {language}, Framework: {framework}
+# Package Manager: {package_manager}
+
+set -e  # Exit on error
+
+echo "=========================================="
+echo "Setting up {repo_path.name}"
+echo "=========================================="
+
+# Check if required tools are installed
+echo "Checking prerequisites..."
+if ! command -v {"uv" if use_uv else "python"} &> /dev/null; then
+    echo "Error: {"uv" if use_uv else "Python"} is not installed or not in PATH"
+    {"echo 'Please install uv: https://docs.astral.sh/uv/getting-started/installation/'" if use_uv else "echo 'Please install Python: https://python.org/downloads/'"}
+    exit 1
+fi
+
+"""
+            
+            # Add setup commands
+            if "setup" in commands:
+                script_content += "echo \"Setting up project environment...\"\n"
+                for cmd in commands["setup"]:
+                    script_content += f"{cmd}\n"
+                script_content += "\n"
+            
+            # Add install commands
+            if "install" in commands:
+                script_content += "echo \"Installing dependencies...\"\n"
+                for cmd in commands["install"]:
+                    script_content += f"{cmd}\n"
+                script_content += "\n"
+            
+            # Add build commands
+            if "build" in commands:
+                script_content += "echo \"Building project...\"\n"
+                for cmd in commands["build"]:
+                    script_content += f"{cmd}\n"
+                script_content += "\n"
+            
+            script_content += """echo "=========================================="
+echo "Setup completed successfully!"
+echo "=========================================="
+
+echo ""
+echo "Next steps:"
+"""
+            
+            # Add run commands
+            if "run" in commands:
+                script_content += f"echo \"To run the application: {commands['run'][0]}\"\n"
+            
+            if "test" in commands:
+                script_content += f"echo \"To run tests: {commands['test'][0]}\"\n"
+            
+            script_content += """echo "To containerize: python repocontainerizer.py containerize <repo_url>"
+echo ""
+"""
+        
+        return script_content
