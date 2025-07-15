@@ -8,3 +8,4 @@ progress 5:30 PM : Backend workflow
 progress 6:00 PM : Workflow testing
 progress 6:30 PM : workflow testing
 progress 7:30 PM : test application debugging 
+progress 8:00 PM : test application debugging 
