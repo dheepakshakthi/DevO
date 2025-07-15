@@ -27,8 +27,8 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.syntax import Syntax
 from rich.prompt import Prompt, Confirm
 import git
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai import types
 
 # Import utility functions
 from utils import (
@@ -74,8 +74,9 @@ class RepoContainerizer:
     
     def __init__(self, api_key: str):
         self.api_key = api_key
-        self.client = genai.Client(api_key=api_key)
-        self.model = "gemini-2.5-pro"
+        if api_key:
+            genai.configure(api_key=api_key)
+        self.model = "gemini-2.0-flash-exp"
         self.temp_dir = None
         
     def clone_repository(self, repo_url: str) -> str:
@@ -297,31 +298,36 @@ class RepoContainerizer:
         """
         
         try:
-            contents = [
-                types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(text=analysis_prompt)],
-                ),
-            ]
-            
-            config = types.GenerateContentConfig(
-                response_mime_type="application/json",
-                system_instruction=[
-                    types.Part.from_text(text="""You are an expert DevOps engineer specializing in containerization. 
-                    Refine and optimize Docker configurations with security best practices, performance optimizations, 
-                    and framework-specific improvements. Always generate production-ready configurations."""),
-                ],
+            # Generate content using the current API
+            model = genai.GenerativeModel(
+                model_name=self.model,
+                system_instruction="""You are an expert DevOps engineer specializing in containerization. 
+                Refine and optimize Docker configurations with security best practices, performance optimizations, 
+                and framework-specific improvements. Always generate production-ready configurations.
+                
+                IMPORTANT: You must respond with valid JSON only. Do not include any markdown formatting, 
+                code blocks, or explanatory text. Just return the raw JSON object."""
             )
             
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config,
-            )
+            response = model.generate_content(analysis_prompt)
             
-            analysis_data = json.loads(response.text)
-            return RepositoryAnalysis(**analysis_data)
+            # Clean up the response text (remove markdown formatting if present)
+            response_text = response.text.strip()
+            if response_text.startswith("```json"):
+                response_text = response_text[7:]  # Remove ```json
+            if response_text.endswith("```"):
+                response_text = response_text[:-3]  # Remove ```
+            response_text = response_text.strip()
             
+            # Try to parse JSON
+            try:
+                analysis_data = json.loads(response_text)
+                return RepositoryAnalysis(**analysis_data)
+            except json.JSONDecodeError as json_error:
+                console.print(f"⚠️  Invalid JSON response from LLM: {str(json_error)}")
+                console.print(f"📝 Response was: {response_text[:200]}...")
+                raise json_error
+                
         except Exception as e:
             console.print(f"⚠️  LLM analysis failed, using fallback analysis: {str(e)}")
             # Fallback to utility-based analysis
@@ -514,10 +520,37 @@ The container includes a health check: `{analysis.health_check}`
             return False
     
     def cleanup(self):
-        """Clean up temporary files"""
+        """Clean up temporary files with Windows-compatible error handling"""
         if self.temp_dir and os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-            console.print("🧹 Cleaned up temporary files")
+            try:
+                # Try normal cleanup first
+                shutil.rmtree(self.temp_dir)
+                console.print("🧹 Cleaned up temporary files")
+            except PermissionError:
+                # Windows-specific cleanup for locked Git files
+                try:
+                    self._force_remove_directory(self.temp_dir)
+                    console.print("🧹 Cleaned up temporary files (forced)")
+                except Exception as e:
+                    console.print(f"⚠️  Warning: Could not fully clean up temporary files: {str(e)}")
+                    console.print(f"📁 Temporary directory: {self.temp_dir}")
+            except Exception as e:
+                console.print(f"⚠️  Warning: Could not clean up temporary files: {str(e)}")
+                console.print(f"📁 Temporary directory: {self.temp_dir}")
+    
+    def _force_remove_directory(self, path: str):
+        """Force remove directory on Windows by handling file permissions"""
+        import stat
+        
+        def handle_remove_readonly(func, path, exc):
+            """Handle removal of readonly files on Windows"""
+            if os.path.exists(path):
+                # Make the file writable and try again
+                os.chmod(path, stat.S_IWRITE)
+                func(path)
+        
+        # Use onerror parameter to handle permission issues
+        shutil.rmtree(path, onerror=handle_remove_readonly)
     
     def _generate_fallback_dockerfile(self, language: str, framework: str) -> str:
         """Generate a basic Dockerfile as fallback"""
@@ -664,7 +697,7 @@ def containerize(repo_url, output, format, validate, api_key):
         console.print(f"\n[bold]Next Steps:[/bold]")
         console.print(f"1. Navigate to the output directory: [cyan]cd {output}[/cyan]")
         console.print(f"2. Build the container: [cyan]docker build -t my-app .[/cyan]")
-        console.print(f"3. Run the container: [cyan]docker run -p {analysis.port}:8080 my-app[/cyan]")
+        console.print(f"3. Run the container: [cyan]docker run -p {analysis.port}:{analysis.port} my-app[/cyan]")
         
     except Exception as e:
         console.print(f"❌ Error: {str(e)}")

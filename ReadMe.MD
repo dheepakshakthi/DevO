@@ -17,21 +17,66 @@ An advanced LLM-powered AI agent tool that automates the process of understandin
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - Git
+- **uv** (recommended) or pip
 - Docker (optional, for validation)
 - Google Gemini API key
 
-### Quick Setup
+### Quick Setup with uv (Recommended)
 
 #### Windows
 ```cmd
 # Clone the repository
-git clone https://github.com/your-username/repo-containerizer.git
-cd repo-containerizer
+git clone https://github.com/dheepakshakthi/DevO-Hackfinity.git
+cd DevO-Hackfinity
 
-# Run setup script
-setup.bat
+# Install uv if not already installed
+# Visit: https://docs.astral.sh/uv/getting-started/installation/
+
+# Install dependencies using uv
+uv sync
+
+# Set API key
+set GEMINI_API_KEY=your_api_key_here
+
+# Run the tool
+uv run python repo_containerizer.py --help
+```
+
+#### Linux/Mac
+```bash
+# Clone the repository
+git clone https://github.com/dheepakshakthi/DevO-Hackfinity.git
+cd DevO-Hackfinity
+
+# Install uv if not already installed
+# Visit: https://docs.astral.sh/uv/getting-started/installation/
+
+# Install dependencies using uv
+uv sync
+
+# Set API key
+export GEMINI_API_KEY=your_api_key_here
+
+# Run the tool
+uv run python repo_containerizer.py --help
+```
+
+### Alternative Setup with pip
+
+#### Windows
+```cmd
+# Clone the repository
+git clone https://github.com/dheepakshakthi/DevO-Hackfinity.git
+cd DevO-Hackfinity
+
+# Create virtual environment
+python -m venv venv
+venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
 
 # Set API key
 set GEMINI_API_KEY=your_api_key_here
@@ -40,20 +85,14 @@ set GEMINI_API_KEY=your_api_key_here
 #### Linux/Mac
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/repo-containerizer.git
-cd repo-containerizer
+git clone https://github.com/dheepakshakthi/DevO-Hackfinity.git
+cd DevO-Hackfinity
 
-# Make setup script executable and run
-chmod +x setup.sh
-./setup.sh
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
 
-# Set API key
-export GEMINI_API_KEY=your_api_key_here
-```
-
-#### Manual Installation
-```bash
-# Install Python dependencies
+# Install dependencies
 pip install -r requirements.txt
 
 # Set API key
@@ -62,30 +101,40 @@ export GEMINI_API_KEY=your_api_key_here
 
 ## Usage
 
-### Basic Usage
+### Using uv (Recommended)
 
 ```bash
 # Containerize a GitHub repository
-python repo_containerizer.py containerize https://github.com/owner/repo
+uv run python repo_containerizer.py containerize https://github.com/owner/repo
 
 # Specify output directory
-python repo_containerizer.py containerize https://github.com/owner/repo --output ./my-output
+uv run python repo_containerizer.py containerize https://github.com/owner/repo --output ./my-output
 
 # Generate JSON config instead of YAML
-python repo_containerizer.py containerize https://github.com/owner/repo --format json
+uv run python repo_containerizer.py containerize https://github.com/owner/repo --format json
 
 # Validate container by building it
-python repo_containerizer.py containerize https://github.com/owner/repo --validate
+uv run python repo_containerizer.py containerize https://github.com/owner/repo --validate
+```
+
+### Using batch files (Windows convenience)
+
+```cmd
+# Use the convenient batch file
+devo.bat containerize https://github.com/owner/repo
+
+# Or use the standalone version
+devo-standalone.bat containerize https://github.com/owner/repo
 ```
 
 ### Advanced Usage
 
 ```bash
 # Set API key via command line
-python repo_containerizer.py containerize https://github.com/owner/repo --api-key your_api_key
+uv run python repo_containerizer.py containerize https://github.com/owner/repo --api-key your_api_key
 
 # Combine multiple options
-python repo_containerizer.py containerize https://github.com/owner/repo \
+uv run python repo_containerizer.py containerize https://github.com/owner/repo \
   --output ./output \
   --format yaml \
   --validate \
@@ -96,7 +145,7 @@ python repo_containerizer.py containerize https://github.com/owner/repo \
 
 ```bash
 # Show help
-python repo_containerizer.py --help
+uv run python repo_containerizer.py --help
 
 # Containerize a repository
 python repo_containerizer.py containerize REPO_URL [OPTIONS]

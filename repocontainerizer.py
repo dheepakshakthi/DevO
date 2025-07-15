@@ -932,6 +932,27 @@ volumes:
         
         return base_compose
 
+
+def print_colored_text(text: str, color: str):
+    """Print colored text to console. Fallback for systems without rich/colorama."""
+    # Color codes for terminal output
+    colors = {
+        'red': '\033[91m',
+        'green': '\033[92m',
+        'yellow': '\033[93m',
+        'blue': '\033[94m',
+        'magenta': '\033[95m',
+        'cyan': '\033[96m',
+        'white': '\033[97m',
+        'reset': '\033[0m'
+    }
+    
+    if color in colors:
+        print(f"{colors[color]}{text}{colors['reset']}")
+    else:
+        print(text)
+
+
 class RepoContainerizer:
     """Main application class"""
     
@@ -2005,3 +2026,84 @@ echo ""
 """
         
         return script_content
+
+
+def main():
+    """Main function to run the RepoContainerizer CLI"""
+    try:
+        import argparse
+        
+        parser = argparse.ArgumentParser(
+            description="RepoContainerizer - AI-powered repository containerization tool",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog="""
+Examples:
+  python repocontainerizer.py analyze https://github.com/user/repo
+  python repocontainerizer.py containerize https://github.com/user/repo
+  python repocontainerizer.py setup-repo /path/to/repo
+            """
+        )
+        
+        parser.add_argument("command", choices=["analyze", "containerize", "setup-repo"], 
+                          help="Command to execute")
+        parser.add_argument("target", help="Repository URL or local path")
+        parser.add_argument("--output", "-o", default="./output", 
+                          help="Output directory for generated files")
+        parser.add_argument("--validate", action="store_true", 
+                          help="Validate generated Docker configuration")
+        parser.add_argument("--api-key", help="Gemini API key")
+        parser.add_argument("--config", help="Path to configuration file")
+        parser.add_argument("--format", choices=["yaml", "json"], default="yaml",
+                          help="Output format for configuration files")
+        
+        args = parser.parse_args()
+        
+        # Set API key if provided
+        if args.api_key:
+            os.environ["GEMINI_API_KEY"] = args.api_key
+        
+        # Initialize containerizer
+        containerizer = RepoContainerizer(
+            output_dir=args.output,
+            validate=args.validate,
+            config_format=args.format
+        )
+        
+        # Execute command
+        if args.command == "analyze":
+            result = containerizer.analyze_repository(args.target)
+            if result:
+                print_colored_text("✅ Repository analysis completed successfully!", "green")
+                print_colored_text(f"📊 Analysis results saved to: {args.output}", "blue")
+            else:
+                print_colored_text("❌ Repository analysis failed!", "red")
+                sys.exit(1)
+                
+        elif args.command == "containerize":
+            result = containerizer.containerize_repository(args.target)
+            if result:
+                print_colored_text("✅ Repository containerization completed successfully!", "green")
+                print_colored_text(f"🐳 Docker files saved to: {args.output}", "blue")
+            else:
+                print_colored_text("❌ Repository containerization failed!", "red")
+                sys.exit(1)
+                
+        elif args.command == "setup-repo":
+            result = containerizer.setup_repository(args.target)
+            if result:
+                print_colored_text("✅ Repository setup completed successfully!", "green")
+                print_colored_text(f"📁 Setup files saved to: {args.output}", "blue")
+            else:
+                print_colored_text("❌ Repository setup failed!", "red")
+                sys.exit(1)
+                
+    except KeyboardInterrupt:
+        print_colored_text("\n👋 Operation cancelled by user", "yellow")
+        sys.exit(0)
+    except Exception as e:
+        print_colored_text(f"💥 Unexpected error: {str(e)}", "red")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

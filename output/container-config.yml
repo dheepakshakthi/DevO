@@ -1,0 +1,51 @@
+analysis:
+  build_tools:
+  - docker
+  database: sqlite
+  dependencies:
+  - flask-cors
+  - flask
+  - aliyun-python-sdk-core
+  - pyyaml
+  - httpx
+  - paypalrestsdk
+  - alibabacloud_dysmsapi20170525
+  - apscheduler
+  - alembic
+  - certifi
+  - flask-limiter
+  - openai
+  - aliyun-python-sdk-eci
+  - alipay-sdk-python
+  - click
+  - boto3
+  - python-gitlab
+  - flask-sqlalchemy
+  - typed_ast
+  external_services:
+  - mysql
+  framework: flask
+  package_manager: pip
+  primary_language: Python
+containerization:
+  commands:
+    build: python setup.py build (if applicable)
+    install: pip install --no-cache-dir -r requirements.txt
+    start: python app.py
+    test: pytest
+  environment_variables:
+    APP_SETTINGS: Configuration file location, e.g., config.py
+    DATABASE_URL: Database connection URL (if using external DB)
+    FLASK_APP: Entry point for flask application, e.g., app.py
+    FLASK_ENV: Development or Production
+    OPENAI_API_KEY: OpenAI API Key
+    PORT: 'Application port (default: 8080)'
+    PWD: Current working directory
+  health_check:
+    interval: 30s
+    retries: 3
+    test: curl -f http://localhost:8080/app/get || exit 1
+    timeout: 10s
+  image_name: python-app
+  ports:
+  - 8080:8080
