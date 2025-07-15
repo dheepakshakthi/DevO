@@ -1,0 +1,39 @@
+analysis:
+  dependencies: []
+  framework: generic
+  language: python
+commands:
+  build: docker build -t {image_name} .
+  compose: docker-compose up -d
+  run: docker run -p 8080:8080 {image_name}
+containerization:
+  environment:
+    NODE_ENV: PRODUCTION
+    PORT: '8080'
+  health_check:
+    interval: 30s
+    retries: 3
+    test: curl -f http://localhost:8080/health || exit 1
+    timeout: 10s
+  image_name: biopsy_and_abnormality_reporting_system_in_endoscopy-app
+  ports:
+  - 8080:8080
+  volumes:
+  - ./logs:/app/logs
+repository:
+  info:
+    description: Reporting biopsy instruments, anatomical location and polyps during
+      colonoscopy for automatic reporting
+    forks: 0
+    language: Python
+    name: Biopsy_and_Abnormality_reporting_system_in_Endoscopy
+    size: 8755
+    stars: 0
+    topics:
+    - medical-imaging
+    - object-detection
+    - realtime-tracking
+    - yolov11
+  name: Biopsy_and_Abnormality_reporting_system_in_Endoscopy
+  owner: dheepakshakthi
+  url: https://github.com/dheepakshakthi/Biopsy_and_Abnormality_reporting_system_in_Endoscopy
