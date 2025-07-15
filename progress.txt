@@ -15,3 +15,5 @@ progress 10:00 PM : adding additional features
 progress 10:30 PM : adding additional features
 progress 11:00 PM : adding additional features
 progress 11:30 PM : bug fixing
+progress 12:00 AM : bug fixing
+progress 12:30 AM : bug fixing
