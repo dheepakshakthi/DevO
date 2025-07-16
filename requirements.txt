@@ -4,6 +4,7 @@ pyyaml>=6.0.1
 requests>=2.31.0
 rich>=13.7.0
 gitpython>=3.1.40
+<<<<<<< HEAD
 
 # Local LLM Support
 torch>=2.0.0
@@ -17,3 +18,5 @@ llama-cpp-python>=0.2.0
 # Optional for better performance
 # sentencepiece>=0.1.99
 # tokenizers>=0.13.0
+=======
+>>>>>>> 61d6948eb508ecf7ddd43451e4759e1046ba66f0
