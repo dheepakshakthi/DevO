@@ -5,28 +5,13 @@ services:
     build: .
     ports:
       - "8080:8080"
-    depends_on:
-      - redis
     environment:
-      - REDIS_URL=redis://redis:6379
-      - FLASK_ENV=production
-    volumes:
-      - ./logs:/app/logs
+      - NODE_ENV=production
+      - PORT=8080
     restart: unless-stopped
+    user: "node:node"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 30s
       timeout: 10s
       retries: 3
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  logs:

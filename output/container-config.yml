@@ -1,34 +1,50 @@
 analysis:
   build_tools:
-  - python build
-  database: redis
+  - npm start
+  - npm test
+  - npm build
+  - typescript
+  database: none
   dependencies:
-  - blinker
-  - click
-  - itsdangerous
-  - jinja2
-  - markupsafe
-  - werkzeug
+  - '@types/node'
+  - '@azure/identity'
+  - eslint-config-prettier
+  - zod-to-json-schema
+  - jest
+  - prettier
+  - '@types/jest'
+  - azure-devops-extension-sdk
+  - tsconfig-paths
+  - typescript-eslint
+  - ts-jest
+  - typescript
+  - jest-extended
+  - zod
+  - '@modelcontextprotocol/sdk'
+  - eslint-plugin-header
+  - azure-devops-extension-api
+  - azure-devops-node-api
+  - '@modelcontextprotocol/inspector'
+  - shx
   external_services: []
-  framework: flask
-  package_manager: pip
-  primary_language: Python
+  framework: generic
+  package_manager: npm
+  primary_language: TypeScript
 containerization:
   commands:
-    build: python -m compileall src
-    install: pip install --no-cache-dir -r requirements.txt
-    start: flask run --host=0.0.0.0 --port=$PORT
-    test: pytest tests
+    build: npm run build
+    install: npm install
+    start: node dist/index.js
+    test: npm test
   environment_variables:
-    FLASK_APP: app.py
-    FLASK_ENV: production
-    PORT: '8080'
-    REDIS_URL: redis://redis:6379
+    ADO_MCP_AZURE_TOKEN_CREDENTIALS: 'Environment variable: ADO_MCP_AZURE_TOKEN_CREDENTIALS'
+    AZURE_TOKEN_CREDENTIALS: 'Environment variable: AZURE_TOKEN_CREDENTIALS'
+    PORT: Application port
   health_check:
     interval: 30s
     retries: 3
-    test: redis-cli ping || exit 1
+    test: curl -f http://localhost:8080 || exit 1
     timeout: 10s
-  image_name: python-app
+  image_name: typescript-app
   ports:
   - 8080:8080

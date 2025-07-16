@@ -1189,6 +1189,47 @@ Analyzed {len(suggestions)} files and generated improvement suggestions.
         
         return report
 
+@cli.command()
+@click.option('--repo-path', '-r', help='Path to repository for analysis')
+@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
+@click.option('--save-session', is_flag=True, help='Save chat session to file')
+def chat(repo_path, api_key, save_session):
+    """Start interactive chat with DevO AI assistant"""
+    
+    if not api_key:
+        console.print("❌ API key required. Set GEMINI_API_KEY environment variable or use --api-key option.")
+        sys.exit(1)
+    
+    from chat import DevOChatSession
+    
+    # Initialize chat session
+    session = DevOChatSession(api_key, repo_path)
+    session.display_banner()
+    
+    try:
+        while True:
+            # Get user input
+            user_input = Prompt.ask("\n[bold blue]You[/bold blue]", default="")
+            
+            if not user_input.strip():
+                continue
+            
+            # Process command
+            should_continue = session.process_command(user_input)
+            if not should_continue:
+                break
+                
+    except KeyboardInterrupt:
+        console.print("\n\n👋 Chat interrupted. Goodbye!")
+    except Exception as e:
+        console.print(f"\n❌ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        # Save session if requested
+        if save_session:
+            session.save_session()
+
 
 if __name__ == "__main__":
     cli()
