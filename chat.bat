@@ -1,6 +1,6 @@
 @echo off
-echo DevO Chat - AI Assistant for Development
-echo =======================================
+echo DevO Chat - Unified AI Development Assistant
+echo ==========================================
 echo.
 
 REM Check if uv is installed
@@ -13,17 +13,13 @@ if %errorlevel% neq 0 (
 )
 
 echo Starting DevO Chat...
-echo.
-echo Available commands:
-echo   - help        Show help
-echo   - analyze     Analyze repository
-echo   - suggest     Get suggestions  
-echo   - deps        Check dependencies
-echo   - security    Security analysis
-echo   - containerize Help with Docker
-echo   - context     Show repo context
-echo   - exit        Exit chat
+echo Repository will be analyzed automatically.
+echo Chat naturally about your code and development needs!
 echo.
 
-REM Start chat with current directory as repo path
-uv run python repo_containerizer.py chat --repo-path . %*
+REM Run the unified chat application
+uv run python chat.py --repo-path .
+
+echo.
+echo Chat session ended. Thanks for using DevO!
+pause

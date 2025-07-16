@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-DevO Chat - Interactive AI Assistant for Repository Analysis
-A conversational interface for code analysis, suggestions, and dependency management
+DevO Chat - Unified Interactive AI Assistant
+A comprehensive conversational interface for repository analysis, code suggestions, 
+dependency management, containerization, and all development tasks in one place.
 """
 
 import os
@@ -12,6 +13,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 import traceback
+import subprocess
+import shutil
+import tempfile
 
 import click
 from rich.console import Console
@@ -26,6 +30,7 @@ from rich.spinner import Spinner
 from rich.columns import Columns
 from rich.layout import Layout
 from rich.align import Align
+from rich.progress import Progress, SpinnerColumn, TextColumn
 import google.generativeai as genai
 
 # Load environment variables
@@ -41,350 +46,461 @@ from utils import (
     detect_package_manager, extract_dependencies
 )
 from templates import get_dockerfile_template
+from auto_setup import AutoSetupManager
 
 console = Console()
 
 class DevOChatSession:
-    """Main chat session handler"""
+    """Unified chat session handler with built-in repository analysis and AI assistance"""
     
     def __init__(self, api_key: str, repo_path: str = None):
         self.api_key = api_key
-        self.repo_path = repo_path
+        self.repo_path = Path(repo_path) if repo_path else Path.cwd()
         self.chat_history = []
-        self.context = {}
+        self.repo_context = None
         self.session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         # Initialize Gemini
-        if api_key:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(
-                model_name="gemini-2.0-flash-exp",
-                system_instruction=self._get_system_instruction()
-            )
-        else:
-            self.model = None
-            
-        # Initialize repository context if provided
-        if repo_path:
-            self._analyze_repository_context()
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel("gemini-2.0-flash-exp")
+        
+        # Initialize auto setup manager
+        self.auto_setup = AutoSetupManager(api_key)
+        
+        # Auto-analyze repository on startup
+        self._initialize_repository_context()
+        
+        console.print(Panel.fit(
+            f"🚀 [bold green]DevO Chat Assistant Initialized[/bold green]\n"
+            f"📁 Repository: {self.repo_path.name}\n"
+            f"🤖 AI Model: Gemini 2.0 Flash\n"
+            f"💬 Ready for all your development needs!\n\n"
+            f"[dim]Type your questions naturally or use commands like:[/dim]\n"
+            f"[cyan]• analyze my code[/cyan]\n"
+            f"[cyan]• check dependencies[/cyan]\n"
+            f"[cyan]• help with containerization[/cyan]\n"
+            f"[cyan]• suggest improvements[/cyan]\n"
+            f"[cyan]• fix security issues[/cyan]\n"
+            f"[cyan]• setup <repo_url> - Auto setup repository[/cyan]\n"
+            f"[cyan]• help or exit[/cyan]",
+            title="DevO Chat Assistant",
+            border_style="green"
+        ))
+        
+        if self.repo_context:
+            self._display_repository_overview()
     
-    def _get_system_instruction(self) -> str:
-        """Get system instruction for the AI assistant"""
-        return """You are DevO, an expert AI assistant specializing in:
-1. Code analysis and review
-2. Dependency management and security analysis
-3. Docker containerization
-4. DevOps best practices
-5. Repository optimization
-
-You help developers by:
-- Analyzing code for issues and improvements
-- Suggesting fixes for missing dependencies
-- Providing security recommendations
-- Helping with containerization
-- Explaining complex technical concepts clearly
-
-Always provide:
-- Clear, actionable suggestions
-- Code examples when relevant
-- Security considerations
-- Best practice recommendations
-- Step-by-step instructions when needed
-
-Be conversational but professional, and ask clarifying questions when needed."""
-
-    def _analyze_repository_context(self):
-        """Analyze the repository to provide context"""
-        if not self.repo_path or not os.path.exists(self.repo_path):
+    def _initialize_repository_context(self):
+        """Automatically analyze repository context on startup"""
+        try:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+                transient=True
+            ) as progress:
+                task = progress.add_task("🔍 Analyzing repository...", total=1)
+                self.repo_context = self._analyze_repository_context()
+                progress.update(task, completed=1)
+        except Exception as e:
+            console.print(f"[yellow]⚠️  Could not analyze repository: {e}[/yellow]")
+            self.repo_context = None
+    
+    def _display_repository_overview(self):
+        """Display a quick overview of the repository"""
+        if not self.repo_context:
             return
             
+        # Create overview table
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("Property", style="cyan")
+        table.add_column("Value", style="white")
+        
+        table.add_row("Language", self.repo_context.get('language', 'Unknown'))
+        table.add_row("Framework", self.repo_context.get('framework', 'None detected'))
+        table.add_row("Package Manager", self.repo_context.get('package_manager', 'None'))
+        table.add_row("Total Files", str(len(self.repo_context.get('files', []))))
+        
+        if self.repo_context.get('dependencies'):
+            deps = len(self.repo_context['dependencies'])
+            table.add_row("Dependencies", str(deps))
+        
+        console.print(Panel(table, title="📊 Repository Overview", border_style="blue"))
+    
+    def _analyze_repository_context(self):
+        """Analyze repository structure and context"""
+        if not self.repo_path or not self.repo_path.exists():
+            return None
+            
+        context = {
+            'path': str(self.repo_path),
+            'name': self.repo_path.name,
+            'timestamp': datetime.now().isoformat()
+        }
+        
         try:
-            # Get basic repository information
-            repo_files = []
-            for root, dirs, files in os.walk(self.repo_path):
-                # Skip hidden directories and common build directories
-                dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', 'build', 'dist']]
-                
-                for file in files:
-                    if not file.startswith('.') and any(file.endswith(ext) for ext in ['.py', '.js', '.ts', '.json', '.yml', '.yaml', '.md', '.txt', '.dockerfile']):
-                        repo_files.append(os.path.join(root, file))
+            # Get all files in the repository
+            files = []
+            for file_path in self.repo_path.rglob('*'):
+                if file_path.is_file() and not any(ignore in str(file_path) for ignore in ['.git', '__pycache__', 'node_modules', '.env']):
+                    files.append(str(file_path.relative_to(self.repo_path)))
+            
+            # Limit to first 10 files for performance
+            context['files'] = files[:10] if len(files) > 10 else files
+            context['total_files'] = len(files)
             
             # Detect language and framework
-            language = detect_language_from_files(repo_files)
+            context['language'] = detect_language_from_files(self.repo_path)
+            context['framework'] = detect_framework_from_files(self.repo_path)
+            context['package_manager'] = detect_package_manager(self.repo_path)
             
-            # Read key files for context
-            key_files = {}
-            for file_path in repo_files:
-                filename = os.path.basename(file_path)
-                if filename in ['README.md', 'requirements.txt', 'package.json', 'Dockerfile', 'docker-compose.yml', 'pyproject.toml']:
+            # Extract dependencies
+            try:
+                context['dependencies'] = extract_dependencies(self.repo_path)
+            except Exception as e:
+                context['dependencies'] = []
+                
+            # Read key configuration files
+            config_files = ['requirements.txt', 'package.json', 'pyproject.toml', 'Dockerfile', 'docker-compose.yml', 'README.md']
+            context['config_files'] = {}
+            
+            for config_file in config_files:
+                config_path = self.repo_path / config_file
+                if config_path.exists():
                     try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            key_files[filename] = f.read()[:2000]  # Limit content
-                    except:
-                        pass
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            # Truncate large files
+                            if len(content) > 2000:
+                                content = content[:2000] + "... [truncated]"
+                            context['config_files'][config_file] = content
+                    except Exception as e:
+                        context['config_files'][config_file] = f"Error reading file: {e}"
             
-            framework = detect_framework_from_files(repo_files, key_files)
-            
-            
-            # Read key files for context
-            key_files = {}
-            for file_path in repo_files:
-                filename = os.path.basename(file_path)
-                if filename in ['README.md', 'requirements.txt', 'package.json', 'Dockerfile', 'docker-compose.yml', 'pyproject.toml']:
-                    try:
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            key_files[filename] = f.read()[:2000]  # Limit content
-                    except:
-                        pass
-            
-            self.context = {
-                'repo_path': self.repo_path,
-                'language': language,
-                'framework': framework,
-                'files_count': len(repo_files),
-                'key_files': key_files,
-                'file_types': list(set(os.path.splitext(f)[1] for f in repo_files if os.path.splitext(f)[1]))
-            }
+            return context
             
         except Exception as e:
-            console.print(f"⚠️  Warning: Could not analyze repository context: {e}")
+            console.print(f"[yellow]Warning: Could not analyze repository context: {e}[/yellow]")
+            return context
     
-    def display_banner(self):
-        """Display the chat application banner"""
-        banner = """
-╭─────────────────────────────────────────────────────────────────╮
-│                          🤖 DevO Chat                          │
-│                AI-Powered Development Assistant                 │
-│                                                                 │
-│  Chat with AI about code analysis, dependencies, and DevOps    │
-│  Type 'help' for commands or 'exit' to quit                    │
-╰─────────────────────────────────────────────────────────────────╯
-        """
-        console.print(Panel(banner, border_style="blue"))
+    def run(self):
+        """Main chat loop - unified experience with built-in analysis"""
+        console.print("\n" + "="*70)
+        console.print("💬 [bold green]DevO Chat Assistant[/bold green] - Your AI Development Partner")
+        console.print("="*70)
         
-        # Show context information
-        if self.context:
-            info_table = Table(show_header=False, box=None, padding=(0, 1))
-            info_table.add_column("Key", style="cyan")
-            info_table.add_column("Value", style="white")
-            
-            info_table.add_row("📁 Repository", self.context.get('repo_path', 'Not loaded'))
-            info_table.add_row("🔤 Language", self.context.get('language', 'Unknown'))
-            info_table.add_row("🚀 Framework", self.context.get('framework', 'Unknown'))
-            info_table.add_row("📄 Files", str(self.context.get('files_count', 0)))
-            
-            console.print(Panel(info_table, title="Repository Context", border_style="green"))
+        # Show quick tips
+        console.print("\n[dim]💡 Quick Tips:[/dim]")
+        console.print("[dim]• Ask anything about your code: 'What issues do you see?'[/dim]")
+        console.print("[dim]• Get help with specific tasks: 'Help me containerize this app'[/dim]")
+        console.print("[dim]• Natural conversation: 'How can I improve performance?'[/dim]")
+        console.print("[dim]• Type 'help' for commands or 'exit' to quit[/dim]\n")
+        
+        while True:
+            try:
+                # Get user input
+                user_input = Prompt.ask("\n[bold cyan]You[/bold cyan]", default="")
+                
+                if not user_input.strip():
+                    continue
+                
+                # Handle exit commands
+                if user_input.lower() in ['exit', 'quit', 'bye', 'q']:
+                    console.print("\n👋 [green]Thanks for using DevO Chat! Happy coding![/green]")
+                    break
+                
+                # Handle help
+                if user_input.lower() in ['help', 'h', '?']:
+                    self._show_unified_help()
+                    continue
+                
+                # Handle context display
+                if user_input.lower() in ['context', 'info', 'repo']:
+                    self._display_repository_overview()
+                    continue
+                
+                # Handle clear history
+                if user_input.lower() in ['clear', 'reset']:
+                    self.chat_history = []
+                    console.print("[green]✅ Chat history cleared![/green]")
+                    continue
+                
+                # Process with AI - this is where the magic happens
+                self._handle_unified_conversation(user_input)
+                
+            except KeyboardInterrupt:
+                console.print("\n\n👋 [green]Thanks for using DevO Chat! Happy coding![/green]")
+                break
+            except EOFError:
+                console.print("\n\n👋 [green]Thanks for using DevO Chat! Happy coding![/green]")
+                break
+            except Exception as e:
+                console.print(f"[red]❌ Error: {e}[/red]")
+                console.print("[yellow]Please try again or type 'help' for assistance.[/yellow]")
     
-    def show_help(self):
-        """Display help information"""
-        help_content = """
-**Available Commands:**
-• `analyze` - Analyze current repository for issues
-• `deps` - Check and suggest dependency fixes
-• `security` - Security analysis and recommendations
-• `containerize` - Help with Docker containerization
-• `suggest <topic>` - Get suggestions on specific topics
-• `explain <concept>` - Explain technical concepts
-• `fix <issue>` - Get help fixing specific issues
-• `optimize` - Repository optimization suggestions
-• `help` - Show this help message
-• `context` - Show current repository context
+    def _show_unified_help(self):
+        """Show comprehensive help for the unified chat experience"""
+        help_text = """
+🤖 **DevO Chat Assistant - Your AI Development Partner**
+
+**How to Use:**
+Just chat naturally! Ask questions about your code, request help with development tasks, 
+or get suggestions for improvements. The AI has full context of your repository.
+
+**Example Conversations:**
+• "What issues do you see in my code?"
+• "How can I improve the performance of this app?"
+• "Help me containerize this Python application"
+• "What dependencies am I missing?"
+• "Are there any security vulnerabilities?"
+• "How do I optimize this for production?"
+• "Explain how Docker works for this project"
+• "What's the best way to deploy this?"
+
+**Quick Commands:**
+• `help` - Show this help
+• `context` - Show repository information  
 • `clear` - Clear chat history
+• `setup <repo_url>` - Auto setup repository with dependency correction
 • `exit` - Exit the chat
 
-**Examples:**
-• "analyze my Python code for issues"
-• "deps check missing dependencies"
-• "security audit my requirements.txt"
-• "containerize this Flask app"
-• "suggest improvements for performance"
-• "explain docker best practices"
-• "fix import errors in my code"
+**🚀 Auto Setup Feature:**
+Use `setup <repository_url>` to automatically:
+- Clone the repository
+- Detect language and framework
+- Install dependencies with AI-powered error correction
+- Fix common issues automatically
+- Validate the setup
+- Generate comprehensive report
+
+**Features:**
+✅ **Automatic Analysis** - Repository analyzed on startup
+✅ **Natural Conversation** - Chat like you would with a developer
+✅ **Context Aware** - AI knows your codebase and tech stack
+✅ **Code Suggestions** - Get specific code improvements
+✅ **Security Analysis** - Identify vulnerabilities and fixes
+✅ **Containerization** - Docker and deployment help
+✅ **Dependency Management** - Missing packages and updates
+✅ **Auto Setup** - Automatic repository setup with error fixing
+✅ **Best Practices** - Industry-standard recommendations
         """
-        console.print(Panel(Markdown(help_content), title="DevO Chat Help", border_style="yellow"))
+        console.print(Panel(Markdown(help_text), title="DevO Chat Help", border_style="blue"))
     
-    def show_context(self):
-        """Display current repository context"""
-        if not self.context:
-            console.print("No repository context loaded. Use 'load <path>' to load a repository.")
-            return
-            
-        context_table = Table(title="Repository Context", show_header=True)
-        context_table.add_column("Property", style="cyan")
-        context_table.add_column("Value", style="white")
-        
-        for key, value in self.context.items():
-            if key == 'key_files':
-                context_table.add_row("Key Files", ", ".join(value.keys()))
-            elif key == 'file_types':
-                context_table.add_row("File Types", ", ".join(value))
-            else:
-                context_table.add_row(key.replace('_', ' ').title(), str(value))
-        
-        console.print(context_table)
-    
-    def process_command(self, user_input: str) -> bool:
-        """Process user commands and return False if should exit"""
-        user_input = user_input.strip()
-        
-        # Handle special commands
-        if user_input.lower() in ['exit', 'quit', 'bye']:
-            console.print("👋 Thanks for using DevO Chat! Happy coding!")
-            return False
-            
-        elif user_input.lower() == 'help':
-            self.show_help()
-            return True
-            
-        elif user_input.lower() == 'context':
-            self.show_context()
-            return True
-            
-        elif user_input.lower() == 'clear':
-            self.chat_history = []
-            console.clear()
-            self.display_banner()
-            console.print("✅ Chat history cleared!")
-            return True
-            
-        elif user_input.lower().startswith('load '):
-            path = user_input[5:].strip()
-            if os.path.exists(path):
-                self.repo_path = path
-                self._analyze_repository_context()
-                console.print(f"✅ Repository loaded: {path}")
-                self.show_context()
-            else:
-                console.print(f"❌ Path not found: {path}")
-            return True
-        
-        # Handle AI conversation
-        return self._handle_ai_conversation(user_input)
-    
-    def _handle_ai_conversation(self, user_input: str) -> bool:
-        """Handle AI conversation with context"""
-        if not self.model:
-            console.print("❌ AI model not available. Please check your API key.")
-            return True
-        
+    def _handle_unified_conversation(self, user_input: str):
+        """Handle natural conversation with built-in analysis capabilities"""
         try:
-            # Show thinking spinner
-            with console.status("🤔 DevO is thinking...", spinner="dots"):
-                # Prepare context for AI
-                context_prompt = self._prepare_context_prompt(user_input)
+            # Check for auto setup command
+            if user_input.lower().startswith('setup '):
+                repo_url = user_input[6:].strip()
+                self._handle_auto_setup(repo_url)
+                return
+            
+            # Add user input to history
+            self.chat_history.append({"role": "user", "content": user_input})
+            
+            # Show thinking indicator
+            with console.status("[bold green]🤖 DevO is thinking...", spinner="dots"):
+                # Build context-aware prompt
+                enhanced_prompt = self._build_context_aware_prompt(user_input)
                 
                 # Get AI response
-                response = self.model.generate_content(context_prompt)
-                
-                # Store in history
-                self.chat_history.append({
-                    'user': user_input,
-                    'ai': response.text,
-                    'timestamp': datetime.now().isoformat()
-                })
+                response = self.model.generate_content(enhanced_prompt)
+                ai_response = response.text
             
-            # Display AI response
-            console.print(Panel(
-                Markdown(response.text),
-                title="🤖 DevO Assistant",
-                border_style="blue"
-            ))
+            # Add AI response to history
+            self.chat_history.append({"role": "assistant", "content": ai_response})
+            
+            # Display response with nice formatting
+            console.print(f"\n[bold green]🤖 DevO:[/bold green]")
+            console.print(Panel(Markdown(ai_response), border_style="green", padding=(1, 2)))
             
         except Exception as e:
-            console.print(f"❌ Error: {e}")
-            console.print("Please try again or check your API key.")
-        
-        return True
+            console.print(f"[red]❌ Error getting AI response: {e}[/red]")
+            console.print("[yellow]Please try rephrasing your question or check your API key.[/yellow]")
     
-    def _prepare_context_prompt(self, user_input: str) -> str:
-        """Prepare context-aware prompt for the AI"""
-        prompt_parts = [user_input]
+    def _build_context_aware_prompt(self, user_input: str) -> str:
+        """Build a comprehensive prompt with repository context"""
+        context_info = ""
         
-        # Add repository context if available
-        if self.context:
+        if self.repo_context:
             context_info = f"""
-Repository Context:
-- Path: {self.context.get('repo_path', 'Unknown')}
-- Language: {self.context.get('language', 'Unknown')}
-- Framework: {self.context.get('framework', 'Unknown')}
-- Files: {self.context.get('files_count', 0)}
-- File Types: {', '.join(self.context.get('file_types', []))}
+REPOSITORY CONTEXT:
+- Path: {self.repo_context.get('path', 'Unknown')}
+- Language: {self.repo_context.get('language', 'Unknown')}
+- Framework: {self.repo_context.get('framework', 'Unknown')}
+- Package Manager: {self.repo_context.get('package_manager', 'Unknown')}
+- Total Files: {self.repo_context.get('total_files', 0)}
+- Key Files: {', '.join(self.repo_context.get('files', [])[:10])}
+
+DEPENDENCIES:
+{self.repo_context.get('dependencies', [])}
+
+CONFIGURATION FILES:
 """
-            
-            # Add key file contents if relevant
-            if self.context.get('key_files'):
-                context_info += "\nKey Files:\n"
-                for filename, content in self.context['key_files'].items():
-                    context_info += f"\n{filename}:\n```\n{content[:1000]}...\n```\n"
-            
-            prompt_parts.append(context_info)
+            for filename, content in self.repo_context.get('config_files', {}).items():
+                context_info += f"\n{filename}:\n{content[:500]}...\n"
         
-        # Add recent chat history for context
+        # Build conversation history
+        history_context = ""
         if self.chat_history:
-            recent_history = self.chat_history[-3:]  # Last 3 exchanges
-            history_text = "\nRecent conversation:\n"
-            for exchange in recent_history:
-                history_text += f"User: {exchange['user']}\n"
-                history_text += f"AI: {exchange['ai'][:200]}...\n\n"
-            prompt_parts.append(history_text)
+            history_context = "\nCONVERSATION HISTORY:\n"
+            for entry in self.chat_history[-6:]:  # Last 6 entries
+                role = "User" if entry["role"] == "user" else "Assistant"
+                history_context += f"{role}: {entry['content'][:200]}...\n"
         
-        return "\n".join(prompt_parts)
+        system_prompt = """You are DevO, an expert AI development assistant. You help developers with:
+
+🔍 **Code Analysis**: Review code for bugs, performance issues, and improvements
+🔒 **Security**: Identify vulnerabilities and suggest fixes  
+📦 **Dependencies**: Manage packages, check for updates, resolve conflicts
+🐳 **Containerization**: Docker setup, optimization, and deployment
+🚀 **DevOps**: CI/CD, deployment strategies, and best practices
+💡 **Suggestions**: Architecture improvements and modern practices
+
+INSTRUCTIONS:
+- Always provide specific, actionable advice
+- Include code examples when relevant
+- Consider the project's tech stack and context
+- Explain complex concepts clearly
+- Ask clarifying questions when needed
+- Focus on practical solutions
+
+Respond conversationally but professionally. Use emojis sparingly and appropriately."""
+        
+        full_prompt = f"""{system_prompt}
+
+{context_info}
+
+{history_context}
+
+USER QUESTION: {user_input}
+
+Please provide a helpful, contextual response based on the repository information and conversation history."""
+        
+        return full_prompt
     
-    def save_session(self):
-        """Save chat session to file"""
-        if not self.chat_history:
-            return
-            
-        session_file = f"chat_session_{self.session_id}.json"
+    def _handle_auto_setup(self, repo_url: str):
+        """Handle automatic repository setup"""
         try:
-            with open(session_file, 'w') as f:
-                json.dump({
-                    'session_id': self.session_id,
-                    'context': self.context,
-                    'chat_history': self.chat_history,
-                    'timestamp': datetime.now().isoformat()
-                }, f, indent=2)
-            console.print(f"💾 Session saved to {session_file}")
+            console.print(f"[cyan]🚀 Starting auto setup for: {repo_url}[/cyan]")
+            
+            # Validate URL
+            if not repo_url.startswith(('http://', 'https://', 'git@')):
+                console.print("[red]❌ Invalid repository URL. Please provide a valid git URL.[/red]")
+                return
+            
+            # Run auto setup
+            success = self.auto_setup.setup_repository(repo_url)
+            
+            if success:
+                console.print("\n[green]🎉 Repository setup completed successfully![/green]")
+                console.print("[cyan]You can now navigate to the cloned repository and start development.[/cyan]")
+                
+                # Ask if user wants to switch to the new repository
+                from rich.prompt import Confirm
+                if Confirm.ask("Would you like to switch to the newly setup repository?"):
+                    # Extract repo name from URL
+                    repo_name = Path(repo_url).stem
+                    new_repo_path = Path.cwd() / repo_name
+                    
+                    if new_repo_path.exists():
+                        self.repo_path = new_repo_path
+                        self.repo_context = self._analyze_repository_context()
+                        console.print(f"[green]✅ Switched to repository: {new_repo_path}[/green]")
+                        self._display_repository_overview()
+                    else:
+                        console.print("[yellow]⚠️  Repository directory not found for switching.[/yellow]")
+                        
+            else:
+                console.print("[red]❌ Repository setup failed. Please check the URL and try again.[/red]")
+                
         except Exception as e:
-            console.print(f"⚠️  Could not save session: {e}")
+            console.print(f"[red]❌ Auto setup error: {e}[/red]")
+            console.print("[yellow]Please check the repository URL and your internet connection.[/yellow]")
+
+
+# Session management and CLI interface
+def save_session(chat_session: DevOChatSession, filepath: str):
+    """Save chat session to file"""
+    try:
+        session_data = {
+            'session_id': chat_session.session_id,
+            'repo_path': str(chat_session.repo_path),
+            'chat_history': chat_session.chat_history,
+            'repo_context': chat_session.repo_context,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(session_data, f, indent=2)
+        
+        console.print(f"[green]✅ Session saved to {filepath}[/green]")
+        return True
+    except Exception as e:
+        console.print(f"[red]❌ Error saving session: {e}[/red]")
+        return False
+
+
+def load_session(filepath: str) -> Optional[Dict]:
+    """Load chat session from file"""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+        
+        console.print(f"[green]✅ Session loaded from {filepath}[/green]")
+        return session_data
+    except Exception as e:
+        console.print(f"[red]❌ Error loading session: {e}[/red]")
+        return None
+
 
 @click.command()
-@click.option('--repo-path', '-r', help='Path to repository for analysis')
-@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key')
-@click.option('--save-session', is_flag=True, help='Save chat session to file')
-def chat(repo_path, api_key, save_session):
-    """Start interactive chat with DevO AI assistant"""
+@click.option('--repo-path', '-r', default='.', help='Path to repository to analyze')
+@click.option('--api-key', '-k', help='Gemini API key (can also use GEMINI_API_KEY env var)')
+@click.option('--save-session', '-s', help='Save session to file')
+@click.option('--load-session', '-l', help='Load session from file')
+def main(repo_path, api_key, save_session, load_session):
+    """DevO Chat - Unified AI Development Assistant
+    
+    A comprehensive conversational interface for repository analysis, code suggestions,
+    dependency management, containerization, and all development tasks in one place.
+    """
+    
+    # Get API key from parameter, environment, or .env file
+    if not api_key:
+        api_key = os.getenv('GEMINI_API_KEY')
     
     if not api_key:
-        console.print("❌ API key required. Set GEMINI_API_KEY environment variable or use --api-key option.")
-        sys.exit(1)
-    
-    # Initialize chat session
-    session = DevOChatSession(api_key, repo_path)
-    session.display_banner()
+        console.print("[red]❌ No API key provided![/red]")
+        console.print("[yellow]Please set GEMINI_API_KEY environment variable or use --api-key parameter[/yellow]")
+        console.print("[dim]Example: export GEMINI_API_KEY=your_api_key_here[/dim]")
+        return
     
     try:
-        while True:
-            # Get user input
-            user_input = Prompt.ask("\n[bold blue]You[/bold blue]", default="")
-            
-            if not user_input.strip():
-                continue
-            
-            # Process command
-            should_continue = session.process_command(user_input)
-            if not should_continue:
-                break
-                
-    except KeyboardInterrupt:
-        console.print("\n\n👋 Chat interrupted. Goodbye!")
-    except Exception as e:
-        console.print(f"\n❌ Unexpected error: {e}")
-        traceback.print_exc()
-    finally:
+        # Initialize chat session
+        repo_path = Path(repo_path).resolve()
+        chat_session = DevOChatSession(api_key, repo_path)
+        
+        # Load session if requested
+        if load_session:
+            session_data = load_session(load_session)
+            if session_data:
+                chat_session.chat_history = session_data.get('chat_history', [])
+                console.print("[green]✅ Previous session loaded![/green]")
+        
+        # Run chat
+        chat_session.run()
+        
         # Save session if requested
         if save_session:
-            session.save_session()
+            save_session(chat_session, save_session)
+            
+    except KeyboardInterrupt:
+        console.print("\n\n👋 [green]Thanks for using DevO Chat! Happy coding![/green]")
+    except Exception as e:
+        console.print(f"[red]❌ Error: {e}[/red]")
+        console.print("[yellow]Please check your API key and try again.[/yellow]")
 
-if __name__ == "__main__":
-    chat()
+
+if __name__ == '__main__':
+    main()
