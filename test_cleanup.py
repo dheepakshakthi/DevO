@@ -66,7 +66,7 @@ def test_cleanup_function():
             if os.path.exists(test_dir):
                 shutil.rmtree(test_dir, ignore_errors=True)
         except:
-            pass
+            self.log(f"Exception occurred: {e}", "ERROR")
         return False
 
 if __name__ == "__main__":

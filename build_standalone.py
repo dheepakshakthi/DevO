@@ -1,19 +1,20 @@
+        import PyInstaller
+from pathlib import Path
+import os
+import platform
+import shutil
+import subprocess
+import sys
+
 #!/usr/bin/env python3
 """
 Build script for creating standalone executables
 """
 
-import os
-import sys
-import subprocess
-import shutil
-from pathlib import Path
-import platform
 
 def install_pyinstaller():
     """Install PyInstaller if not available"""
     try:
-        import PyInstaller
         print("✅ PyInstaller is already installed")
         return True
     except ImportError:
@@ -27,6 +28,7 @@ def install_pyinstaller():
             return False
 
 def build_executable():
+# TODO: Consider breaking this function into smaller functions
     """Build standalone executable"""
     print("🔨 Building standalone executable...")
     
@@ -56,6 +58,7 @@ def build_executable():
         return False
 
 def create_distribution():
+# TODO: Consider breaking this function into smaller functions
     """Create distribution package"""
     print("📦 Creating distribution package...")
     

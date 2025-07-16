@@ -316,7 +316,7 @@ def detect_build_tools(files: List[str], file_contents: Dict[str, str]) -> List[
                 build_tools.append('npm start')
                 
         except json.JSONDecodeError:
-            pass
+            self.log(f"Exception occurred: {e}", "ERROR")
     
     return list(set(build_tools))
 
@@ -348,7 +348,8 @@ def generate_health_check_command(language: str, framework: str, port: int) -> s
     
     if language.lower() in health_checks:
         framework_checks = health_checks[language.lower()]
-        return framework_checks.get(framework.lower(), framework_checks.get('generic', f'curl -f http://localhost:{port} || exit 1'))
+        return framework_checks.get(framework.lower(), framework_checks.get('generic',
+            f'curl -f http://localhost:{port} || exit 1'))
     
     return f'curl -f http://localhost:{port} || exit 1'
 

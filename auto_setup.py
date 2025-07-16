@@ -1,34 +1,36 @@
+    from dotenv import load_dotenv
+    import argparse
+from pathlib import Path
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+from rich.table import Table
+from rich.text import Text
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
+import google.generativeai as genai
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
 #!/usr/bin/env python3
 """
 Auto Setup Module - Automatic Repository Setup and Dependency Correction
 Handles cloning, dependency installation, error detection, and automatic fixes
 """
 
-import os
-import sys
-import json
-import subprocess
-import shutil
-import tempfile
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from urllib.parse import urlparse
-import re
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-from rich.table import Table
-from rich.text import Text
-from rich.markdown import Markdown
-import google.generativeai as genai
 
 # Load environment variables
 try:
-    from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass
+    self.log(f"Exception occurred: {e}", "ERROR")
 
 console = Console()
 
@@ -48,6 +50,7 @@ class AutoSetupManager:
             console.print("[yellow]⚠️  No API key available. AI-powered fixes will be disabled.[/yellow]")
     
     def setup_repository(self, repo_url: str, target_dir: str = None) -> bool:
+    # TODO: Consider breaking this function into smaller functions
         """Automatically setup repository with dependency correction and error fixing"""
         
         console.print(Panel.fit(
@@ -89,6 +92,7 @@ class AutoSetupManager:
             return False
     
     def _clone_repository(self, repo_url: str, target_dir: str = None) -> Optional[str]:
+    # TODO: Consider breaking this function into smaller functions
         """Clone repository from URL"""
         try:
             # Extract repo name from URL
@@ -103,7 +107,8 @@ class AutoSetupManager:
             
             # Remove existing directory if it exists
             if target_path.exists():
-                console.print(f"[yellow]📁 Directory {target_path} already exists, removing...[/yellow]")
+                console.print(f"[yellow]📁 Directory {target_path} already exists,
+                    removing...[/yellow]")
                 shutil.rmtree(target_path)
             
             # Clone repository
@@ -133,6 +138,7 @@ class AutoSetupManager:
             return None
     
     def _analyze_repository_structure(self, repo_path: str) -> Dict:
+    # TODO: Consider breaking this function into smaller functions
         """Analyze repository structure and detect project type"""
         repo_info = {
             'path': repo_path,
@@ -199,6 +205,7 @@ class AutoSetupManager:
             return repo_info
     
     def _analyze_python_project(self, repo_path: Path) -> Dict:
+    # TODO: Consider breaking this function into smaller functions
         """Analyze Python project specifics"""
         info = {
             'package_manager': 'pip',
@@ -246,6 +253,7 @@ class AutoSetupManager:
         return info
     
     def _analyze_node_project(self, repo_path: Path) -> Dict:
+    # TODO: Consider breaking this function into smaller functions
         """Analyze Node.js project specifics"""
         info = {
             'package_manager': 'npm',
@@ -296,6 +304,7 @@ class AutoSetupManager:
         return info
     
     def _setup_environment(self, repo_path: str, repo_info: Dict) -> bool:
+    # TODO: Consider breaking this function into smaller functions
         """Setup environment and install dependencies"""
         try:
             os.chdir(repo_path)
@@ -318,6 +327,7 @@ class AutoSetupManager:
             return False
     
     def _setup_python_environment(self, repo_info: Dict) -> bool:
+    # TODO: Consider breaking this function into smaller functions
         """Setup Python environment with automatic dependency correction"""
         try:
             with Progress(
@@ -368,6 +378,7 @@ class AutoSetupManager:
             return False
     
     def _setup_node_environment(self, repo_info: Dict) -> bool:
+    # TODO: Consider breaking this function into smaller functions
         """Setup Node.js environment with automatic dependency correction"""
         try:
             package_manager = repo_info['package_manager']
@@ -412,6 +423,7 @@ class AutoSetupManager:
             return False
     
     def _fix_python_dependencies(self, error_output: str):
+    # TODO: Consider breaking this function into smaller functions
         """Fix Python dependency issues using AI"""
         if not self.model:
             return
@@ -449,6 +461,7 @@ class AutoSetupManager:
             console.print(f"[red]❌ AI dependency fix failed: {e}[/red]")
     
     def _fix_node_dependencies(self, error_output: str, package_manager: str):
+    # TODO: Consider breaking this function into smaller functions
         """Fix Node.js dependency issues using AI"""
         if not self.model:
             return
@@ -487,6 +500,7 @@ class AutoSetupManager:
             console.print(f"[red]❌ AI dependency fix failed: {e}[/red]")
     
     def _execute_ai_fixes(self, ai_response: str):
+    # TODO: Consider breaking this function into smaller functions
         """Extract and execute commands from AI response"""
         try:
             # Extract code blocks that look like commands
@@ -519,6 +533,7 @@ class AutoSetupManager:
         self._check_configuration_errors(repo_path, repo_info)
     
     def _check_import_errors(self, repo_path: str, repo_info: Dict):
+    # TODO: Consider breaking this function into smaller functions
         """Check for import errors and fix them"""
         if repo_info['language'] != 'python':
             return
@@ -560,6 +575,7 @@ class AutoSetupManager:
             console.print(f"[red]❌ Import error check failed: {e}[/red]")
     
     def _check_syntax_errors(self, repo_path: str, repo_info: Dict):
+    # TODO: Consider breaking this function into smaller functions
         """Check for syntax errors"""
         if repo_info['language'] != 'python':
             return
@@ -581,6 +597,7 @@ class AutoSetupManager:
             console.print(f"[red]❌ Syntax error check failed: {e}[/red]")
     
     def _fix_syntax_error(self, file_path: Path, error_msg: str):
+    # TODO: Consider breaking this function into smaller functions
         """Fix syntax errors using AI"""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -631,6 +648,7 @@ class AutoSetupManager:
                 self._create_missing_file(repo_path, file_name, repo_info)
     
     def _create_missing_file(self, repo_path: Path, file_name: str, repo_info: Dict):
+    # TODO: Consider breaking this function into smaller functions
         """Create missing essential files"""
         try:
             if file_name == 'requirements.txt' and repo_info['language'] == 'python':
@@ -669,6 +687,7 @@ class AutoSetupManager:
         console.print("[cyan]🔧 Configuration check complete[/cyan]")
     
     def _validate_setup(self, repo_path: str, repo_info: Dict) -> Dict:
+    # TODO: Consider breaking this function into smaller functions
         """Validate the setup was successful"""
         validation_result = {
             'success': True,
@@ -716,6 +735,7 @@ class AutoSetupManager:
         return result
     
     def _validate_node_setup(self, repo_info: Dict) -> Dict:
+    # TODO: Consider breaking this function into smaller functions
         """Validate Node.js setup"""
         result = {'success': True, 'errors': [], 'warnings': []}
         
@@ -782,7 +802,6 @@ Your repository is now ready for development with AI-powered assistance!
 
 def main():
     """Main function for testing auto setup"""
-    import argparse
     
     parser = argparse.ArgumentParser(description='Auto Setup Repository')
     parser.add_argument('repo_url', help='Repository URL to setup')

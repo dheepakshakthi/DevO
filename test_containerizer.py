@@ -135,9 +135,11 @@ def test_file_creation():
             dependencies=["flask", "psycopg2"],
             build_tools=["pip"],
             port=5000,
-            environment_vars={"DATABASE_URL": "Database connection string", "SECRET_KEY": "Secret key"},
+            environment_vars={"DATABASE_URL": "Database connection string",
+                "SECRET_KEY": "Secret key"},
             commands={"install": "pip install -r requirements.txt", "start": "python app.py"},
-            dockerfile_content="FROM python:3.9-slim\nWORKDIR /app\nCOPY . .\nEXPOSE 5000\nCMD [\"python\", \"app.py\"]",
+            dockerfile_content="FROM python:3.9-slim\nWORKDIR /app\nCOPY . .\nEXPOSE 5000\nCMD [\"python\",
+                \"app.py\"]",
             docker_compose_content="version: '3.8'\nservices:\n  app:\n    build: .\n    ports:\n      - \"5000:5000\"",
             health_check="curl -f http://localhost:5000/health || exit 1"
         )

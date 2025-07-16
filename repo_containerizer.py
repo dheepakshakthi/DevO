@@ -144,7 +144,8 @@ class RepoContainerizer:
         # Walk through repository
         for root, dirs, files in os.walk(repo_path):
             # Skip hidden directories and common build directories
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules', '__pycache__', 'target', 'build', 'dist']]
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['node_modules',
+                '__pycache__', 'target', 'build', 'dist']]
             
             rel_root = os.path.relpath(root, repo_path)
             if rel_root != ".":
@@ -312,7 +313,8 @@ class RepoContainerizer:
             model = genai.GenerativeModel(
                 model_name=self.model,
                 system_instruction="""You are an expert DevOps engineer specializing in containerization. 
-                Refine and optimize Docker configurations with security best practices, performance optimizations, 
+                Refine and optimize Docker configurations with security best practices,
+                    performance optimizations, 
                 and framework-specific improvements. Always generate production-ready configurations.
                 
                 IMPORTANT: You must respond with valid JSON only. Do not include any markdown formatting, 
@@ -639,7 +641,8 @@ def cli():
 @cli.command()
 @click.argument('repo_url')
 @click.option('--output', '-o', default='./output', help='Output directory for generated files')
-@click.option('--format', '-f', type=click.Choice(['yaml', 'json']), default='yaml', help='Config file format')
+@click.option('--format', '-f', type=click.Choice(['yaml', 'json']), default='yaml',
+    help='Config file format')
 @click.option('--validate', is_flag=True, help='Validate container by building it')
 @click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
 def containerize(repo_url, output, format, validate, api_key):
@@ -772,7 +775,8 @@ def setup():
 
 @cli.command()
 @click.argument('repo_path')
-@click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
+@click.option('--api-key', envvar='GEMINI_API_KEY',
+    help='Gemini API key (or set GEMINI_API_KEY env var)')
 @click.option('--output', '-o', default='./suggestions', help='Output directory for suggestions')
 @click.option('--language', '-l', help='Programming language filter')
 @click.option('--focus', '-f', type=click.Choice(['security', 'performance', 'maintainability', 'all']), 
@@ -952,7 +956,8 @@ def fix_code(repo_path, api_key, output, dry_run, backup):
 @cli.command()
 @click.argument('repo_path')
 @click.option('--api-key', envvar='GEMINI_API_KEY', help='Gemini API key (or set GEMINI_API_KEY env var)')
-@click.option('--output', '-o', default='./analysis_report', help='Output directory for analysis report')
+@click.option('--output', '-o', default='./analysis_report',
+    help='Output directory for analysis report')
 @click.option('--include-suggestions', is_flag=True, help='Include code suggestions in report')
 @click.option('--include-dependencies', is_flag=True, help='Include dependency analysis in report')
 @click.option('--include-security', is_flag=True, help='Include security analysis in report')

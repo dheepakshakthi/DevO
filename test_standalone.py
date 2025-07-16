@@ -180,7 +180,8 @@ def test_end_to_end():
     
     try:
         # Test with a simple command
-        cmd = ["python", "repocontainerizer.py", "containerize", "https://github.com/octocat/Hello-World", "--output", "./test_output"]
+        cmd = ["python", "repocontainerizer.py", "containerize",
+            "https://github.com/octocat/Hello-World", "--output", "./test_output"]
         
         # This would require an API key, so we'll just test the command parsing
         print("⚠️  End-to-end test requires API key - skipping actual execution")

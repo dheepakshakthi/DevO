@@ -1,16 +1,18 @@
+from pathlib import Path
+import os
+import subprocess
+import sys
+import time
+
 #!/usr/bin/env python3
 """
 RepoContainerizer Demo Script
 Demonstrates all the features of the standalone CLI application
 """
 
-import os
-import sys
-import subprocess
-import time
-from pathlib import Path
 
 def run_command(cmd, description):
+# TODO: Consider breaking this function into smaller functions
     """Run a command and display the output"""
     print(f"\n{'='*60}")
     print(f"🚀 {description}")
@@ -54,7 +56,8 @@ def main():
         ("python repocontainerizer.py version", "Version Information"),
         ("python repocontainerizer.py help", "Help System"),
         ("python repocontainerizer.py config", "Configuration Management"),
-        ("python repocontainerizer.py config set default_output_dir ./demo_output", "Setting Configuration"),
+        ("python repocontainerizer.py config set default_output_dir ./demo_output",
+            "Setting Configuration"),
         ("python repocontainerizer.py config get default_output_dir", "Getting Configuration"),
     ]
     

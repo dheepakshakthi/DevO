@@ -1,3 +1,35 @@
+                from rich.prompt import Confirm
+    from dotenv import load_dotenv
+from auto_setup import AutoSetupManager
+from datetime import datetime
+from pathlib import Path
+from rich.align import Align
+from rich.columns import Columns
+from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.prompt import Prompt
+from rich.spinner import Spinner
+from rich.syntax import Syntax
+from rich.table import Table
+from rich.text import Text
+from templates import get_dockerfile_template
+from typing import Dict, List, Optional, Any
+from utils import (
+import asyncio
+import click
+import google.generativeai as genai
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import traceback
+
 #!/usr/bin/env python3
 """
 DevO Chat - Unified Interactive AI Assistant
@@ -5,48 +37,18 @@ A comprehensive conversational interface for repository analysis, code suggestio
 dependency management, containerization, and all development tasks in one place.
 """
 
-import os
-import sys
-import json
-import asyncio
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-import traceback
-import subprocess
-import shutil
-import tempfile
 
-import click
-from rich.console import Console
-from rich.panel import Panel
-from rich.markdown import Markdown
-from rich.prompt import Prompt
-from rich.syntax import Syntax
-from rich.table import Table
-from rich.text import Text
-from rich.live import Live
-from rich.spinner import Spinner
-from rich.columns import Columns
-from rich.layout import Layout
-from rich.align import Align
-from rich.progress import Progress, SpinnerColumn, TextColumn
-import google.generativeai as genai
 
 # Load environment variables
 try:
-    from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass
+    self.log(f"Exception occurred: {e}", "ERROR")
 
 # Import from existing modules
-from utils import (
     detect_language_from_files, detect_framework_from_files, 
     detect_package_manager, extract_dependencies
 )
-from templates import get_dockerfile_template
-from auto_setup import AutoSetupManager
 
 console = Console()
 
@@ -54,6 +56,7 @@ class DevOChatSession:
     """Unified chat session handler with built-in repository analysis and AI assistance"""
     
     def __init__(self, api_key: str, repo_path: str = None):
+    # TODO: Consider breaking this function into smaller functions
         self.api_key = api_key
         self.repo_path = Path(repo_path) if repo_path else Path.cwd()
         self.chat_history = []
@@ -107,6 +110,7 @@ class DevOChatSession:
             self.repo_context = None
     
     def _display_repository_overview(self):
+    # TODO: Consider breaking this function into smaller functions
         """Display a quick overview of the repository"""
         if not self.repo_context:
             console.print("[yellow]⚠️  No repository context available[/yellow]")
@@ -134,6 +138,7 @@ class DevOChatSession:
         console.print(Panel(table, title="📊 Repository Overview", border_style="blue"))
     
     def _analyze_repository_context(self):
+    # TODO: Consider breaking this function into smaller functions
         """Analyze repository structure and context"""
         if not self.repo_path or not self.repo_path.exists():
             console.print(f"[yellow]⚠️  Repository path invalid or doesn't exist: {self.repo_path}[/yellow]")
@@ -149,7 +154,8 @@ class DevOChatSession:
             # Get all files in the repository
             files = []
             for file_path in self.repo_path.rglob('*'):
-                if file_path.is_file() and not any(ignore in str(file_path) for ignore in ['.git', '__pycache__', 'node_modules', '.env']):
+                if file_path.is_file() and not any(ignore in str(file_path) for ignore in ['.git',
+                    '__pycache__', 'node_modules', '.env']):
                     files.append(str(file_path.relative_to(self.repo_path)))
             
             # Limit to first 10 files for performance
@@ -212,6 +218,7 @@ class DevOChatSession:
             return context
     
     def run(self):
+    # TODO: Consider breaking this function into smaller functions
         """Main chat loop - unified experience with built-in analysis"""
         console.print("\n" + "="*70)
         console.print("💬 [bold green]DevO Chat Assistant[/bold green] - Your AI Development Partner")
@@ -315,6 +322,7 @@ Use `setup <repository_url>` to automatically:
         console.print(Panel(Markdown(help_text), title="DevO Chat Help", border_style="blue"))
     
     def _handle_unified_conversation(self, user_input: str):
+    # TODO: Consider breaking this function into smaller functions
         """Handle natural conversation with built-in analysis capabilities"""
         try:
             # Check for auto setup command
@@ -425,7 +433,6 @@ Please provide a helpful, contextual response based on the repository informatio
                 console.print("[cyan]You can now navigate to the cloned repository and start development.[/cyan]")
                 
                 # Ask if user wants to switch to the new repository
-                from rich.prompt import Confirm
                 if Confirm.ask("Would you like to switch to the newly setup repository?"):
                     # Extract repo name from URL
                     repo_name = Path(repo_url).stem
@@ -449,6 +456,7 @@ Please provide a helpful, contextual response based on the repository informatio
 
 # Session management and CLI interface
 def save_session(chat_session: DevOChatSession, filepath: str):
+# TODO: Consider breaking this function into smaller functions
     """Save chat session to file"""
     try:
         session_data = {

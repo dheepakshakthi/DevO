@@ -1,17 +1,19 @@
+from pathlib import Path
+import json
+import os
+import shutil
+import subprocess
+import sys
+
 #!/usr/bin/env python3
 """
 Build Script for DevO Chat Standalone Executable
 Creates a standalone .exe file that can run without Python installation
 """
 
-import os
-import sys
-import shutil
-import subprocess
-from pathlib import Path
-import json
 
 def create_spec_file():
+# TODO: Consider breaking this function into smaller functions
     """Create PyInstaller spec file for DevO Chat"""
     spec_content = """# -*- mode: python ; coding: utf-8 -*-
 
@@ -109,6 +111,7 @@ exe = EXE(
     print("✅ Created devochat.spec file")
 
 def create_build_requirements():
+# TODO: Consider breaking this function into smaller functions
     """Create requirements file for building"""
     build_requirements = """
 # Build requirements for DevO Chat standalone executable
@@ -145,6 +148,7 @@ cachetools>=5.2.0
     print("✅ Created build-requirements.txt")
 
 def create_build_script():
+# TODO: Consider breaking this function into smaller functions
     """Create build script for Windows"""
     build_script = """@echo off
 REM DevO Chat Standalone Executable Build Script
@@ -218,6 +222,7 @@ pause
     print("✅ Created build_standalone.bat")
 
 def create_launcher_script():
+# TODO: Consider breaking this function into smaller functions
     """Create launcher script for the built executable"""
     launcher_script = """@echo off
 REM DevO Chat Standalone Executable Launcher
@@ -265,6 +270,7 @@ pause
     print("✅ Created launch_devochat.bat")
 
 def create_distribution_readme():
+# TODO: Consider breaking this function into smaller functions
     """Create README for distribution"""
     readme_content = """# DevO Chat - Standalone Executable
 
@@ -368,7 +374,8 @@ For issues or questions:
 
 ### 🎉 Enjoy DevO Chat!
 
-Your AI development assistant is ready to help with code analysis, dependency management, containerization, and more - all through natural conversation!
+Your AI development assistant is ready to help with code analysis, dependency management,
+    containerization, and more - all through natural conversation!
 """
     
     with open('DISTRIBUTION_README.md', 'w', encoding='utf-8') as f:

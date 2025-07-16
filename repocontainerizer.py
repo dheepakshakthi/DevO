@@ -108,7 +108,7 @@ class Config:
                 with open(self.config_file, 'r') as f:
                     return json.load(f)
             except Exception:
-                pass
+                self.log(f"Exception occurred: {e}", "ERROR")
         
         # Default configuration
         return {
@@ -153,7 +153,7 @@ class Logger:
             with open(self.log_file, 'a', encoding='utf-8') as f:
                 f.write(log_entry)
         except Exception:
-            pass
+            self.log(f"Exception occurred: {e}", "ERROR")
         
         if self.verbose:
             console.print(f"[{level}] {message}")
@@ -325,7 +325,7 @@ class RepositoryAnalyzer:
                             dep = re.split(r'[>=<~!]', line)[0].strip()
                             dependencies.append(dep)
             except Exception:
-                pass
+                self.log(f"Exception occurred: {e}", "ERROR")
         
         # Node.js dependencies
         package_json = repo_path / "package.json"
@@ -338,11 +338,12 @@ class RepositoryAnalyzer:
                     dependencies.extend(list(deps.keys()))
                     dependencies.extend(list(dev_deps.keys()))
             except Exception:
-                pass
+                self.log(f"Exception occurred: {e}", "ERROR")
         
         return dependencies
     
-    def detect_build_commands(self, repo_path: Path, language: str, framework: str) -> Dict[str, List[str]]:
+    def detect_build_commands(self, repo_path: Path, language: str, framework: str) -> Dict[str,
+        List[str]]:
         """Detect build and setup commands for the repository"""
         commands = {
             "setup": [],

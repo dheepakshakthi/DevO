@@ -1,11 +1,13 @@
+        from repo_containerizer import RepoContainerizer
+from pathlib import Path
+import os
+import sys
+
 #!/usr/bin/env python3
 """
 Example usage of RepoContainerizer
 """
 
-import os
-import sys
-from pathlib import Path
 
 # Add the current directory to the path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -20,7 +22,6 @@ def main():
     print("=" * 50)
     
     try:
-        from repo_containerizer import RepoContainerizer
         
         # Initialize the containerizer
         containerizer = RepoContainerizer(api_key)
