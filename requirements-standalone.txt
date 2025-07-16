@@ -1,0 +1,17 @@
+# RepoContainerizer Standalone - Minimal Dependencies
+# Only essential packages for core functionality
+
+# Core dependencies (required)
+pyyaml>=6.0.1
+requests>=2.31.0
+
+# Optional but recommended (for better CLI experience)
+rich>=13.7.0
+
+# Build dependencies (optional, for creating executables)
+pyinstaller>=5.13.0
+
+# Note: The standalone version is designed to work with minimal dependencies
+# If rich is not available, it will fallback to basic terminal output
+# If requests is not available, it will use urllib (built-in)
+# If pyyaml is not available, it will use json only

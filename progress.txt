@@ -1,0 +1,21 @@
+progress 2:30 PM : workflow 
+progress 3:00 PM : Interface 
+progress 3:30 PM : Interface
+progress 4:00 PM : Backend
+progress 4:30 PM : Backend
+progress 5:00 PM : Backend
+progress 5:30 PM : Backend workflow
+progress 6:00 PM : Workflow testing
+progress 6:30 PM : workflow testing
+progress 7:30 PM : test application debugging 
+progress 8:00 PM : test application debugging 
+progress 9:00 PM : test application debugging
+progress 9:30 PM : test application debugging 
+progress 10:00 PM : adding additional features
+progress 10:30 PM : adding additional features
+progress 11:00 PM : adding additional features
+progress 11:30 PM : bug fixing
+progress 12:00 AM : bug fixing
+progress 12:30 AM : bug fixing
+progress 1:00 AM : bug fixing
+progress 2:45 AM : application deployment

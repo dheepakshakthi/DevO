@@ -1,0 +1,25 @@
+{
+  "preferred_provider": "ollama",
+  "models": {
+    "codellama": {
+      "ollama_name": "codellama:7b-instruct",
+      "transformers_name": "codellama/CodeLlama-7b-Instruct-hf",
+      "description": "Code-focused LLM for programming tasks"
+    },
+    "llama2": {
+      "ollama_name": "llama2:7b-chat",
+      "transformers_name": "meta-llama/Llama-2-7b-chat-hf",
+      "description": "General purpose conversational LLM"
+    },
+    "mistral": {
+      "ollama_name": "mistral:7b-instruct",
+      "transformers_name": "mistralai/Mistral-7B-Instruct-v0.1",
+      "description": "Efficient general purpose LLM"
+    }
+  },
+  "generation_params": {
+    "temperature": 0.7,
+    "max_tokens": 1024,
+    "timeout": 300
+  }
+}

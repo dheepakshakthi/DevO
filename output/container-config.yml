@@ -1,0 +1,50 @@
+analysis:
+  build_tools:
+  - npm start
+  - npm test
+  - npm build
+  - typescript
+  database: none
+  dependencies:
+  - '@types/node'
+  - '@azure/identity'
+  - eslint-config-prettier
+  - zod-to-json-schema
+  - jest
+  - prettier
+  - '@types/jest'
+  - azure-devops-extension-sdk
+  - tsconfig-paths
+  - typescript-eslint
+  - ts-jest
+  - typescript
+  - jest-extended
+  - zod
+  - '@modelcontextprotocol/sdk'
+  - eslint-plugin-header
+  - azure-devops-extension-api
+  - azure-devops-node-api
+  - '@modelcontextprotocol/inspector'
+  - shx
+  external_services: []
+  framework: generic
+  package_manager: npm
+  primary_language: TypeScript
+containerization:
+  commands:
+    build: npm run build
+    install: npm install
+    start: node dist/index.js
+    test: npm test
+  environment_variables:
+    ADO_MCP_AZURE_TOKEN_CREDENTIALS: 'Environment variable: ADO_MCP_AZURE_TOKEN_CREDENTIALS'
+    AZURE_TOKEN_CREDENTIALS: 'Environment variable: AZURE_TOKEN_CREDENTIALS'
+    PORT: Application port
+  health_check:
+    interval: 30s
+    retries: 3
+    test: curl -f http://localhost:8080 || exit 1
+    timeout: 10s
+  image_name: typescript-app
+  ports:
+  - 8080:8080

@@ -1,0 +1,57 @@
+{
+  "version": "2.0",
+  "setup_date": "1752637593.4287803",
+  "ai_providers": {
+    "gemini": {
+      "enabled": true,
+      "api_key_env": "GEMINI_API_KEY",
+      "model": "gemini-2.0-flash-exp"
+    },
+    "local_llm": {
+      "enabled": true,
+      "preferred_provider": "ollama",
+      "fallback_provider": "transformers"
+    }
+  },
+  "models": {
+    "codellama": {
+      "ollama_name": "codellama:7b-instruct",
+      "transformers_name": "codellama/CodeLlama-7b-Instruct-hf",
+      "ggml_name": "codellama-7b-instruct.q4_0.gguf",
+      "description": "Code-focused LLM for programming tasks"
+    },
+    "llama2": {
+      "ollama_name": "llama2:7b-chat",
+      "transformers_name": "meta-llama/Llama-2-7b-chat-hf",
+      "ggml_name": "llama-2-7b-chat.ggmlv3.q8_0.bin",
+      "description": "General purpose conversational LLM"
+    },
+    "mistral": {
+      "ollama_name": "mistral:7b-instruct",
+      "transformers_name": "mistralai/Mistral-7B-Instruct-v0.1",
+      "ggml_name": "mistral-7b-instruct-v0.1.q4_0.gguf",
+      "description": "Efficient general purpose LLM"
+    }
+  },
+  "memory_management": {
+    "max_memory_usage": "auto",
+    "enable_model_offloading": true,
+    "cache_models": true
+  },
+  "gpu_settings": {
+    "auto_detect": true,
+    "device_map": "auto",
+    "load_in_8bit": false,
+    "load_in_4bit": false
+  },
+  "generation_params": {
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "timeout": 300
+  },
+  "paths": {
+    "models_dir": "C:\\DevO-Hackfinity\\models",
+    "cache_dir": "C:\\DevO-Hackfinity\\cache",
+    "logs_dir": "C:\\DevO-Hackfinity\\logs"
+  }
+}

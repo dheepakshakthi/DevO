@@ -1,0 +1,19 @@
+google-genai>=0.3.0
+click>=8.1.7
+pyyaml>=6.0.1
+requests>=2.31.0
+rich>=13.7.0
+gitpython>=3.1.40
+
+# Local LLM Support
+torch>=2.0.0
+transformers>=4.30.0
+accelerate>=0.20.0
+python-dotenv>=1.0.0
+
+# GGML Model Support
+llama-cpp-python>=0.2.0
+
+# Optional for better performance
+# sentencepiece>=0.1.99
+# tokenizers>=0.13.0

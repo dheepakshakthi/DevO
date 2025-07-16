@@ -1,0 +1,38 @@
+# Enhanced DevO Chat - Unified Requirements
+# Core dependencies
+rich>=13.0.0
+click>=8.0.0
+python-dotenv>=1.0.0
+requests>=2.28.0
+
+# Cloud AI (Gemini)
+google-generativeai>=0.3.0
+
+# Local AI - Basic (CPU)
+torch>=2.0.0
+transformers>=4.35.0
+tokenizers>=0.15.0
+accelerate>=0.25.0
+
+# Local AI - Advanced (Optional, for GPU support)
+# Uncomment if you have CUDA GPU:
+# torch>=2.0.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+# torchvision>=0.15.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+
+# GGML Support (requires compilation or pre-built wheels)
+# llama-cpp-python>=0.2.0
+
+# Optional: Ollama integration (install Ollama separately)
+# No pip package needed, uses REST API
+
+# Development and testing
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# Memory management
+psutil>=5.9.0
+GPUtil>=1.4.0
+
+# Async support
+aiohttp>=3.8.0
+asyncio-throttle>=1.0.0

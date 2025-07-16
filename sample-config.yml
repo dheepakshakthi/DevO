@@ -1,0 +1,34 @@
+containerization:
+  image_name: python-app
+  ports:
+    - "5000:8080"
+  environment_variables:
+    DATABASE_URL: "Database connection string"
+    SECRET_KEY: "Secret key for Flask sessions"
+    FLASK_ENV: "Flask environment mode"
+    PORT: "Application port"
+  commands:
+    install: "pip install -r requirements.txt"
+    build: "python setup.py build"
+    start: "python app.py"
+    test: "python -m pytest"
+  health_check:
+    test: "curl -f http://localhost:5000/health || exit 1"
+    interval: "30s"
+    timeout: "10s"
+    retries: 3
+
+analysis:
+  primary_language: "Python"
+  framework: "Flask"
+  package_manager: "pip"
+  database: "postgresql"
+  external_services:
+    - "redis"
+  dependencies:
+    - "flask"
+    - "psycopg2"
+    - "redis"
+  build_tools:
+    - "pip"
+    - "python setuptools"

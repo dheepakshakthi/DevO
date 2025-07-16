@@ -1,0 +1,25 @@
+# DevO Unified Chat - Core Dependencies
+# Install with: pip install -r requirements-unified.txt
+
+# Core UI and CLI
+rich>=13.0.0
+click>=8.0.0
+
+# AI and API
+google-generativeai>=0.7.0
+requests>=2.31.0
+
+# System and utilities
+psutil>=5.9.0
+python-dotenv>=1.0.0
+
+# Local LLM support (optional, install separately for GPU support)
+# torch>=2.0.0  # Install with specific CUDA version
+# transformers>=4.30.0
+# accelerate>=0.20.0
+
+# Optional GGML support
+# llama-cpp-python>=0.2.0
+
+# Optional Ollama support
+# ollama-python>=0.1.0

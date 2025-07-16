@@ -1,0 +1,103 @@
+name: DevO Chat CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install UV
+      run: |
+        curl -LsSf https://astral.sh/uv/install.ps1 | powershell -c -
+        
+    - name: Add UV to PATH
+      run: |
+        echo "$env:USERPROFILE\.cargo\bin" >> $env:GITHUB_PATH
+        
+    - name: Setup environment
+      run: |
+        uv sync --extra build
+        
+    - name: Run code quality checks
+      run: |
+        uv run python -m py_compile chat.py
+        uv run python -m py_compile auto_setup.py
+        uv run python -m py_compile utils.py
+        uv run python -m py_compile templates.py
+        uv run python -m py_compile repocontainerizer.py
+        
+    - name: Run functionality tests
+      run: |
+        uv run python -c "import chat; print('Chat module OK')"
+        uv run python -c "import auto_setup; print('Auto setup module OK')"
+        uv run python -c "import utils; print('Utils module OK')"
+        uv run python -c "import templates; print('Templates module OK')"
+        
+    - name: Build standalone executable
+      run: |
+        uv run pyinstaller --onefile --console --name devochat --add-data "sample-config.yml;." --add-data "templates.py;." --add-data "utils.py;." --add-data "auto_setup.py;." --add-data "repocontainerizer.py;." --collect-all google.generativeai --collect-all rich --collect-all click --collect-all yaml --collect-all requests --collect-all git --collect-all dotenv --hidden-import=google.generativeai --hidden-import=rich --hidden-import=click --hidden-import=yaml --hidden-import=requests --hidden-import=git --hidden-import=dotenv --hidden-import=os --hidden-import=sys --hidden-import=json --hidden-import=subprocess --hidden-import=pathlib chat.py
+        
+    - name: Test executable
+      run: |
+        ./dist/devochat.exe --help
+        
+    - name: Create distribution package
+      run: |
+        mkdir release
+        cp dist/devochat.exe release/
+        cp STANDALONE_EXECUTABLE_GUIDE.md release/
+        cp sample-config.yml release/
+        cp launch_devochat.bat release/
+        echo "Build Date: $(Get-Date)" > release/BUILD_INFO.txt
+        echo "File Size: $((Get-Item release/devochat.exe).Length) bytes" >> release/BUILD_INFO.txt
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: devochat-windows
+        path: release/
+        
+    - name: Upload to release
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release/devochat.exe
+          release/STANDALONE_EXECUTABLE_GUIDE.md
+          release/sample-config.yml
+          release/launch_devochat.bat
+          release/BUILD_INFO.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  security-scan:
+    runs-on: windows-latest
+    needs: build-and-test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Run security scan
+      uses: github/super-linter@v4
+      env:
+        DEFAULT_BRANCH: main
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VALIDATE_PYTHON: true
+        VALIDATE_YAML: true
+        VALIDATE_MARKDOWN: true
