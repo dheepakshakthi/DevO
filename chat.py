@@ -109,6 +109,7 @@ class DevOChatSession:
     def _display_repository_overview(self):
         """Display a quick overview of the repository"""
         if not self.repo_context:
+            console.print("[yellow]⚠️  No repository context available[/yellow]")
             return
             
         # Create overview table
@@ -119,17 +120,23 @@ class DevOChatSession:
         table.add_row("Language", self.repo_context.get('language', 'Unknown'))
         table.add_row("Framework", self.repo_context.get('framework', 'None detected'))
         table.add_row("Package Manager", self.repo_context.get('package_manager', 'None'))
-        table.add_row("Total Files", str(len(self.repo_context.get('files', []))))
+        table.add_row("Total Files", str(self.repo_context.get('total_files', 0)))
         
         if self.repo_context.get('dependencies'):
             deps = len(self.repo_context['dependencies'])
             table.add_row("Dependencies", str(deps))
+        
+        # Show key configuration files
+        config_files = self.repo_context.get('config_files', {})
+        if config_files:
+            table.add_row("Config Files", ", ".join(config_files.keys()))
         
         console.print(Panel(table, title="📊 Repository Overview", border_style="blue"))
     
     def _analyze_repository_context(self):
         """Analyze repository structure and context"""
         if not self.repo_path or not self.repo_path.exists():
+            console.print(f"[yellow]⚠️  Repository path invalid or doesn't exist: {self.repo_path}[/yellow]")
             return None
             
         context = {
@@ -149,18 +156,7 @@ class DevOChatSession:
             context['files'] = files[:10] if len(files) > 10 else files
             context['total_files'] = len(files)
             
-            # Detect language and framework
-            context['language'] = detect_language_from_files(self.repo_path)
-            context['framework'] = detect_framework_from_files(self.repo_path)
-            context['package_manager'] = detect_package_manager(self.repo_path)
-            
-            # Extract dependencies
-            try:
-                context['dependencies'] = extract_dependencies(self.repo_path)
-            except Exception as e:
-                context['dependencies'] = []
-                
-            # Read key configuration files
+            # Read key configuration files first
             config_files = ['requirements.txt', 'package.json', 'pyproject.toml', 'Dockerfile', 'docker-compose.yml', 'README.md']
             context['config_files'] = {}
             
@@ -177,6 +173,38 @@ class DevOChatSession:
                     except Exception as e:
                         context['config_files'][config_file] = f"Error reading file: {e}"
             
+            # Detect language and framework
+            try:
+                language_counts = detect_language_from_files(files)
+                if language_counts:
+                    # Get the most common language
+                    context['language'] = max(language_counts, key=language_counts.get)
+                else:
+                    context['language'] = 'Unknown'
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Language detection failed: {e}[/yellow]")
+                context['language'] = 'Unknown'
+            
+            try:
+                context['framework'] = detect_framework_from_files(files, context['config_files'])
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Framework detection failed: {e}[/yellow]")
+                context['framework'] = 'Unknown'
+            
+            try:
+                context['package_manager'] = detect_package_manager(files)
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Package manager detection failed: {e}[/yellow]")
+                context['package_manager'] = 'Unknown'
+            
+            # Extract dependencies
+            try:
+                context['dependencies'] = extract_dependencies(context['config_files'])
+            except Exception as e:
+                console.print(f"[yellow]⚠️  Dependency extraction failed: {e}[/yellow]")
+                context['dependencies'] = []
+            
+            console.print(f"[dim]Repository context created: {context['total_files']} files analyzed[/dim]")
             return context
             
         except Exception as e:
