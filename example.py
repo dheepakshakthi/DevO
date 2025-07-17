@@ -16,7 +16,7 @@ def main():
     """Example usage of RepoContainerizer"""
     
     # Set the API key (replace with your actual API key)
-    api_key = "AIzaSyAwxg1aGIsvBSb17SAE-lFTz_Bh-lIDvrI"
+    api_key = "your_api_key_here"
     
     print("🚀 RepoContainerizer Example")
     print("=" * 50)
