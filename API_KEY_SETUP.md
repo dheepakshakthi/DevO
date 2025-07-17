@@ -4,7 +4,7 @@
 
 ### 1. **Automatic API Key Loading**
 - ✅ Added `python-dotenv` dependency to `pyproject.toml`
-- ✅ Created `.env` file with your API key: `AIzaSyA6nHxg3eSMXwEkpMfJDd2X_xpdYSVAf8g`
+- ✅ Created `.env` file with your API key: `YOUR_API_KEY_HERE`
 - ✅ Updated both `repo_containerizer.py` and `repocontainerizer.py` to load API key from `.env`
 - ✅ API key is now loaded automatically on startup
 
